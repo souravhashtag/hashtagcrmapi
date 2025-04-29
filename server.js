@@ -7,8 +7,6 @@ dotenv.config();
 
 const app = express();
 const userRoutes = require("./routes/user");
-const eventRoutes = require("./routes/event");
-const ticketRoutes = require("./routes/ticket");
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
