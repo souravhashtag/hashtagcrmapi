@@ -8,6 +8,7 @@ dotenv.config();
 const app = express();
 const userRoutes = require("./routes/user");
 const attendanceRoutes = require("./routes/attendance");
+const roleRoutes = require("./routes/role");
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
