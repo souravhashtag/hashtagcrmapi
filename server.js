@@ -7,6 +7,8 @@ dotenv.config();
 
 const app = express();
 const userRoutes = require("./routes/user");
+const eventRoutes = require("./routes/event");
+const ticketRoutes = require("./routes/ticket");
 const attendanceRoutes = require("./routes/attendance");
 const roleRoutes = require("./routes/role");
 app.use(cors());
