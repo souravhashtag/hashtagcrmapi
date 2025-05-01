@@ -34,6 +34,29 @@ class UserController {
         res.status(500).json({ error: err.message });
         }
     };
+    static login = async (req, res) => {
+      try {
+        const { email, password } = req.body;
+  
+        const user = await User.findOne({ email });
+        //res.status(200).json({ user });
+        if (!user) {
+          return res.status(404).json({ error: "User not found" });
+        }
+  
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+          return res.status(400).json({ error: "Invalid credentials" });
+        }
+  
+        const accessToken = generateAccessToken({ id: user._id });
+        const refreshToken = generateRefreshToken({ id: user._id });
+  
+        res.status(200).json({ accessToken, refreshToken });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    };
 }
 
 module.exports = UserController;
