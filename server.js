@@ -17,6 +17,7 @@ const payrollRoutes = require("./routes/payroll");
 const departmentRoutes = require("./routes/department");
 const employeeRoutes = require("./routes/employee");
 const designationRoutes = require("./routes/designation");
+const performaceRoutes = require("./routes/performance");
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
