@@ -23,7 +23,8 @@ const userSchema = new mongoose.Schema({
   phone: String,
   profilePicture: String,
   role: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref:  'Role',
     required: true
   },
   permissions: [String], 

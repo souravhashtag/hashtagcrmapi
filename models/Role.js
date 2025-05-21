@@ -4,7 +4,7 @@ const roleSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    unique: true, // Matches the Index constraint
+    unique: true, 
     trim: true
   },
   display_name: {
@@ -16,9 +16,18 @@ const roleSchema = new mongoose.Schema({
     type: String,
     default: null,
     trim: true
+  },
+  menulist: {
+    type: [
+        {
+          name: { type: String },
+          slug: { type: String }
+        },
+    ],
+    default: []
   }
 }, {
-  timestamps: true // Automatically adds createdAt and updatedAt fields
+  timestamps: true 
 });
 
 module.exports = mongoose.model('Role', roleSchema);
