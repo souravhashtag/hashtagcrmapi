@@ -83,6 +83,14 @@ class UserController {
             console.log(err)
         }
     }
+    static  GetScreenShot = async (req , res) => {
+        try{                 
+              const screenshots = await ScreenShot.find().populate('userid', 'name email');          
+              res.status(201).json(screenshots );
+        }catch(err){
+            console.log(err)
+        }
+    }
     static verifyToken = async (req, res, next) => {
       try {
         const token = req.headers["authorization"];
