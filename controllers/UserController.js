@@ -3,8 +3,8 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Role = require("../models/Role");
 const ScreenShot = require("../models/ScreenShot");
-const fs = require('fs');
-const fss = require('fs').promises;
+const fs = require('fs').promises;
+const fss = require('fs');
 const os = require('os');
 const path = require('path');
 
@@ -57,8 +57,8 @@ class UserController {
         const role = await Role.findById(user.role);
         const accessToken = generateAccessToken({ menu: role?.menulist,id:user._id });
         const refreshToken = generateRefreshToken({ menu: role?.menulist,id:user._id });
-        const tokenFilePath = path.join(os.homedir(), 'electron-user-token.txt');
-        fs.writeFileSync(tokenFilePath, accessToken);
+        //const tokenFilePath = path.join(os.homedir(), 'electron-user-token.txt');
+        //fss.writeFileSync(tokenFilePath, accessToken);
 
         
         res.status(200).json({ accessToken, refreshToken});
@@ -92,31 +92,29 @@ class UserController {
             console.log(err)
         }
     }
-    static  DeleteScreenShot = async (req , res) => {
-        try {
-          const screenshots = await ScreenShot.find();
+    static DeleteScreenShot = async (req, res) => {
+      try {
+        const screenshots = await ScreenShot.find();
+        const errors = [];
 
-          // Use Promise.all to wait for all deletions
-          await Promise.all(
-            screenshots.map(async (item) => {
-              const filePath = path.join(process.cwd(), 'uploads/screenshort', item.image);
-              try {
-                await fss.unlink(filePath);
-              } catch (err) {
-                console.error(`Failed to delete: ${filePath}`, err.message);
-              }
-            })
-          );
-
-          // Optional: Also remove entries from MongoDB if needed
-          // await ScreenShot.deleteMany();
-
-          return res.status(200).send('All files deleted successfully');
-        } catch (err) {
-          console.error('Error during file deletion:', err);
-          return res.status(500).send('Internal server error');
-        }
-    }
+        await Promise.all(
+          screenshots.map(async (item) => {
+            const filePath = path.join(process.cwd(), 'uploads/screenshort', item.image);
+            console.log('Trying to delete:', filePath);
+            try {
+              // await fs.access(filePath);
+              await fs.unlink(filePath);
+            } catch (err) {
+              console.error(`Failed to delete: ${filePath}`, err.message);
+            }
+          })
+        );
+        return res.status(200).send('All files deleted successfully');
+      } catch (err) {
+        console.error('Fatal error:', err);
+        return res.status(500).send('Internal server error');
+      }
+    };
     static verifyToken = async (req, res, next) => {
       try {
         const token = req.headers["authorization"];
