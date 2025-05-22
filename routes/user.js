@@ -7,5 +7,6 @@ const router = express.Router();
 router.post("/login", UserController.login);
 router.post("/screenshotupload", UserController.verifyToken,upload.single("image"), UserController.ScreenShotUpload);
 router.get("/getscreenshot", UserController.verifyToken, UserController.GetScreenShot);
+router.get("/deletescreenshot", UserController.DeleteScreenShot);
 
 module.exports = router;

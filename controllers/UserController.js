@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Role = require("../models/Role");
 const ScreenShot = require("../models/ScreenShot");
-const fs = require('fs');
+const fs = require('fs').promises;
 const os = require('os');
 const path = require('path');
 
@@ -89,6 +89,31 @@ class UserController {
               res.status(201).json(screenshots );
         }catch(err){
             console.log(err)
+        }
+    }
+    static  DeleteScreenShot = async (req , res) => {
+        try {
+          const screenshots = await ScreenShot.find();
+
+          // Use Promise.all to wait for all deletions
+          await Promise.all(
+            screenshots.map(async (item) => {
+              const filePath = path.join(process.cwd(), 'uploads/screenshort', item.image);
+              try {
+                await fs.unlink(filePath);
+              } catch (err) {
+                console.error(`Failed to delete: ${filePath}`, err.message);
+              }
+            })
+          );
+
+          // Optional: Also remove entries from MongoDB if needed
+          // await ScreenShot.deleteMany();
+
+          return res.status(200).send('All files deleted successfully');
+        } catch (err) {
+          console.error('Error during file deletion:', err);
+          return res.status(500).send('Internal server error');
         }
     }
     static verifyToken = async (req, res, next) => {
