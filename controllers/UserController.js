@@ -3,7 +3,8 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Role = require("../models/Role");
 const ScreenShot = require("../models/ScreenShot");
-const fs = require('fs').promises;
+const fs = require('fs');
+const fss = require('fs').promises;
 const os = require('os');
 const path = require('path');
 
@@ -100,7 +101,7 @@ class UserController {
             screenshots.map(async (item) => {
               const filePath = path.join(process.cwd(), 'uploads/screenshort', item.image);
               try {
-                await fs.unlink(filePath);
+                await fss.unlink(filePath);
               } catch (err) {
                 console.error(`Failed to delete: ${filePath}`, err.message);
               }
