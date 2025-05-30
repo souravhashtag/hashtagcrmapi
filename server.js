@@ -24,6 +24,7 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use("/api/V1/auth", userRoutes);
+app.use("/api/V1/attendance", attendanceRoutes);
 
 const PORT = process.env.PORT || 5000;
 mongoose

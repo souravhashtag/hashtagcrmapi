@@ -13,6 +13,16 @@ const attendanceSchema = new mongoose.Schema({
   clockIn: Date,
   clockOut: Date,
   totalHours: Number,
+  breaks: [
+    {
+      start: Date,
+      end: Date
+    }
+  ],
+  totalBreakDuration: {
+    type: Number, 
+    default: 0
+  },
   status: {
     type: String,
     enum: ['present', 'absent', 'late', 'half-day', 'work-from-home'],
@@ -51,19 +61,29 @@ const attendanceSchema = new mongoose.Schema({
 // Auto-update `updatedAt` on save
 attendanceSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
+  this.calculateTotalHours();
   next();
 });
-
 // Virtual to check if the employee was on-site
 attendanceSchema.virtual('isRemote').get(function () {
   return this.status === 'work-from-home';
 });
 
-// Method to calculate total hours (if clockIn and clockOut are present)
 attendanceSchema.methods.calculateTotalHours = function () {
   if (this.clockIn && this.clockOut) {
-    const diff = (this.clockOut - this.clockIn) / (1000 * 60 * 60); // in hours
-    this.totalHours = parseFloat(diff.toFixed(2));
+    const workDuration = (this.clockOut - this.clockIn) / 1000; 
+
+    const totalBreakInSeconds = this.breaks.reduce((acc, brk) => {
+      if (brk.start && brk.end) {
+        return acc + (brk.end - brk.start) / 1000;
+      }
+      return acc;
+    }, 0);
+
+    this.totalBreakDuration = Math.floor(totalBreakInSeconds);
+
+    const netWorkSeconds = Math.max(workDuration - totalBreakInSeconds, 0);
+    this.totalHours = parseFloat((netWorkSeconds / 3600).toFixed(2)); // in hours
   }
 };
 
