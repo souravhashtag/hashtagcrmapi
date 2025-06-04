@@ -19,6 +19,7 @@ class AttendanceController {
           }
           let ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
           const geo = geoip.lookup(ip);
+          console.log("geo",geo);
           const record = new Attendance({
             employeeId:req.user.id,
             date: new Date(today),
