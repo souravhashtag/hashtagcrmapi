@@ -17,7 +17,7 @@ class AttendanceController {
             await existing.save();
             return res.status(200).json({status:200, message: 'Already clocked in today' });
           }
-          const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+          let ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
           const geo = geoip.lookup(ip);
           const record = new Attendance({
             employeeId:req.user.id,
