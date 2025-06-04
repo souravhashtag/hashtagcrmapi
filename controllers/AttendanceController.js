@@ -26,7 +26,7 @@ class AttendanceController {
             clockIn: new Date(),
             clockOut:null,
             status: 'present',
-            location:geo
+            location:geo ? JSON.stringify(geo) : null
           });
 
           await record.save();
