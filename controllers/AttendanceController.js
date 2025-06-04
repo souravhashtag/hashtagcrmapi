@@ -1,5 +1,5 @@
 const Attendance = require('../models/Attendance');
-
+const geoip = require('geoip-lite');
 
 class AttendanceController {
     static createAttendance = async (req, res) => {
@@ -17,13 +17,15 @@ class AttendanceController {
             await existing.save();
             return res.status(200).json({status:200, message: 'Already clocked in today' });
           }
-
+          const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+          const geo = geoip.lookup(ip);
           const record = new Attendance({
             employeeId:req.user.id,
             date: new Date(today),
             clockIn: new Date(),
             clockOut:null,
             status: 'present',
+            location:geo
           });
 
           await record.save();
@@ -49,9 +51,9 @@ class AttendanceController {
           record.calculateTotalHours();
           await record.save();
 
-          res.status(200).json({ message: 'Clocked out successfully', data: record });
+          res.status(200).json({status:200, message: 'Clocked out successfully', data: record });
         } catch (err) {
-          res.status(500).json({ message: 'Error clocking out', error: err.message });
+          res.status(500).json({status:500, message: 'Error clocking out', error: err.message });
         }
     }
     static getIndividualClockInData = async(req, res) => {
@@ -116,6 +118,12 @@ class AttendanceController {
         } catch (err) {
           res.status(500).json({status:500, message: 'Error resuming work', error: err.message });
         }
+    }
+    static GeoLocation = (req, res) => {
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        console.log(ip)
+        const geo = geoip.lookup(ip);
+        console.log(geo)
     }
 }
 

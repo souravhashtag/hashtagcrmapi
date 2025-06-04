@@ -28,11 +28,12 @@ const attendanceSchema = new mongoose.Schema({
     enum: ['present', 'absent', 'late', 'half-day', 'work-from-home'],
     required: true
   },
-  location: {
-    latitude: Number,
-    longitude: Number,
-    ipAddress: String
-  },
+  // location: {
+  //   latitude: Number,
+  //   longitude: Number,
+  //   ipAddress: String
+  // },
+  location: String,
   screenshots: [
     {
       timestamp: Date,

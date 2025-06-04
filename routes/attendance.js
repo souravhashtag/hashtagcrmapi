@@ -9,6 +9,7 @@ router.post('/clock-out', UserController.verifyToken, AttendanceController.clock
 router.get('/get-individual-attendance', UserController.verifyToken, AttendanceController.getIndividualClockInData);
 router.get('/take-a-break', UserController.verifyToken, AttendanceController.takeaBreak);
 router.get('/resume-work', UserController.verifyToken, AttendanceController.ResumeWork);
+router.get('/geo-location', AttendanceController.GeoLocation);
 
 
 module.exports = router;
