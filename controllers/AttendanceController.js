@@ -121,7 +121,7 @@ class AttendanceController {
     }
     static GeoLocation = (req, res) => {
         const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-        alert(ip)
+        console.log(ip)
         const geo = geoip.lookup(ip);
         console.log(geo)
     }
