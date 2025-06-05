@@ -86,8 +86,8 @@ class UserController {
     }
     static  GetScreenShot = async (req , res) => {
         try{                 
-              const screenshots = await ScreenShot.find().populate('userid', 'name email');          
-              res.status(201).json(screenshots );
+              const screenshots = await ScreenShot.find().populate('userid', 'firstName email');          
+              res.status(201).json(screenshots.reverse() );
         }catch(err){
             console.log(err)
         }
@@ -136,12 +136,40 @@ class UserController {
         const user = await User.findOne({_id:req.user.id});
         if (!user) {
           return res.status(404).json({ error: "User not found" });
-        }       
-        res.status(200).json({ user});
+        }  
+        const role = await Role.findById(user.role); 
+        const userObj = user.toObject();
+        userObj.role = role;
+
+
+        res.status(200).json({ user: userObj });
       } catch (err) {
         res.status(500).json({ error: err.message });
       }
     };
+    static userLogout = async (req, res) => {
+        try {
+            const token = req.headers.authorization?.split(' ')[1];
+            
+            if (token) {
+                const decoded = jwt.decode(token);
+                await BlacklistedToken.create({
+                    token: token,
+                    expiresAt: new Date(decoded.exp * 1000)
+                });
+            }            
+            res.status(200).json({ 
+                success: true, 
+                message: 'Logged out successfully' 
+            });
+        } catch (error) {
+            console.error('Logout error:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Logout failed' 
+            });
+        }
+    }
 }
 
 module.exports = UserController;

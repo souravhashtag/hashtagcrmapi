@@ -9,5 +9,6 @@ router.post("/screenshotupload", UserController.verifyToken,upload.single("image
 router.get("/getscreenshot", UserController.verifyToken, UserController.GetScreenShot);
 router.get("/deletescreenshot", UserController.DeleteScreenShot);
 router.get("/getuserdata", UserController.verifyToken, UserController.getUserData);
+router.post("/userlogout", UserController.verifyToken, UserController.userLogout);
 
 module.exports = router;
