@@ -5,6 +5,7 @@ const employeeSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   employeeId: { type: String, required: true, unique: true },
   joiningDate: { type: Date, required: true },
+  dob:{ type: Date, required: true },
   emergencyContact: {
     name: String,
     relationship: String,
