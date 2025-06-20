@@ -29,6 +29,7 @@ app.use("/api/V1/menu", menuRoutes);
 app.use("/api/V1/role", roleRoutes);
 app.use("/api/V1/employee", employeeRoutes);
 app.use("/api/V1/departments", departmentRoutes);
+app.use("/api/V1/designations", designationRoutes);
 
 const PORT = process.env.PORT || 5000;
 mongoose

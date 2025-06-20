@@ -3,7 +3,6 @@ const { Schema } = mongoose;
 
 const designationSchema = new Schema({
   title: { type: String, required: true, unique: true },
-  level: { type: Number, required: true }, // e.g., 1 for entry, 2 for mid, etc.
   department: { type: Schema.Types.ObjectId, ref: 'Department' },
   description: String,
   isActive: { type: Boolean, default: true },

@@ -142,14 +142,7 @@ class EmployeeController {
       }
 
       const total = await Employee.countDocuments(query);
-      
-    filteredEmployees = filteredEmployees.map(emp => {
-      if (emp.userId && emp.userId.profilePicture) {
-        const baseUrl = process.env.FRONT_BASE_URL || 'http://localhost:5000';
-          emp.userId.profilePicture = `${baseUrl}/${emp.userId.profilePicture}`;        
-      }
-      return emp; 
-    });
+
       res.status(200).json({
         success: true,
         data: filteredEmployees,
@@ -302,35 +295,16 @@ class EmployeeController {
       // First, check if employee exists
       const existingEmployee = await Employee.findById(id);
       if (!existingEmployee) {
-        return res.status(404).json({
-          success: false,
-          message: 'Employee not found'
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Employee not found' 
         });
-      }
-
-      // Handle profile picture upload
-      let profilePictureUrl = null;
-      if (req.file) {
-        // Get the uploaded file path/URL
-        profilePictureUrl = req.file.path || req.file.filename || req.file.location;
-        
-        // You might want to process the path based on your multer config
-        // For example, if storing locally:
-        // profilePictureUrl = `/uploads/profile-pictures/${req.file.filename}`;
-        
-        // Or if using cloud storage, req.file.location might already be the full URL
-        console.log('Profile picture uploaded:', profilePictureUrl);
       }
 
       // Update user data if provided
       if (userData && existingEmployee.userId) {
         const userUpdateData = { ...userData };
         
-        // Add profile picture to user data if uploaded
-        if (profilePictureUrl) {
-          userUpdateData.profilePicture = profilePictureUrl;
-        }
-
         // Hash password if provided
         if (userData.password) {
           const saltRounds = 10;
@@ -349,27 +323,19 @@ class EmployeeController {
 
         // Check for duplicate email (excluding current user)
         if (userData.email) {
-          const existingUser = await User.findOne({
+          const existingUser = await User.findOne({ 
             email: userData.email,
             _id: { $ne: existingEmployee.userId }
           });
           if (existingUser) {
-            return res.status(400).json({
-              success: false,
-              message: 'Email already exists for another user'
+            return res.status(400).json({ 
+              success: false, 
+              message: 'Email already exists for another user' 
             });
           }
         }
-
+        
         await User.findByIdAndUpdate(existingEmployee.userId, userUpdateData, {
-          new: true,
-          runValidators: true
-        });
-      } else if (profilePictureUrl && existingEmployee.userId) {
-        // If only profile picture is being updated (no other userData)
-        await User.findByIdAndUpdate(existingEmployee.userId, { 
-          profilePicture: profilePictureUrl 
-        }, {
           new: true,
           runValidators: true
         });
@@ -377,14 +343,14 @@ class EmployeeController {
 
       // Check for duplicate employee ID (excluding current employee)
       if (employeeData.employeeId && employeeData.employeeId !== existingEmployee.employeeId) {
-        const existingEmpId = await Employee.findOne({
+        const existingEmpId = await Employee.findOne({ 
           employeeId: employeeData.employeeId,
           _id: { $ne: id }
         });
         if (existingEmpId) {
-          return res.status(400).json({
-            success: false,
-            message: 'Employee ID already exists'
+          return res.status(400).json({ 
+            success: false, 
+            message: 'Employee ID already exists' 
           });
         }
       }
@@ -401,41 +367,37 @@ class EmployeeController {
         ]
       }).populate('performanceReviews.reviewerId', 'firstName lastName');
 
-      res.status(200).json({
-        success: true,
+      res.status(200).json({ 
+        success: true, 
         data: updatedEmployee,
-        message: profilePictureUrl ? 
-          'Employee and profile picture updated successfully' : 
-          'Employee updated successfully',
-        profilePictureUrl: profilePictureUrl // Include the new image URL in response
+        message: 'Employee updated successfully'
       });
-
     } catch (error) {
       console.error('Error updating employee:', error);
-
+      
       // Handle validation errors
       if (error.name === 'ValidationError') {
         const validationErrors = Object.values(error.errors).map(err => err.message);
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: validationErrors
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Validation failed', 
+          errors: validationErrors 
         });
       }
-
+      
       // Handle duplicate key errors
       if (error.code === 11000) {
         const field = Object.keys(error.keyPattern)[0];
-        return res.status(400).json({
-          success: false,
-          message: `${field} already exists`
+        return res.status(400).json({ 
+          success: false, 
+          message: `${field} already exists` 
         });
       }
-
-      res.status(400).json({
-        success: false,
-        message: 'Failed to update employee',
-        error: error.message
+      
+      res.status(400).json({ 
+        success: false, 
+        message: 'Failed to update employee', 
+        error: error.message 
       });
     }
   }
@@ -475,25 +437,17 @@ class EmployeeController {
   }
   static async getEmployeeProfileById(req, res) {
     try {
+      // const { id } = req.params;
+      // console.log('Fetching employee profile for ID:', req);
+     
       
-      const employee = await Employee.findOne({ userId: req?.user?.id })
-        .select('_id employeeId joiningDate dob') 
-        .populate({
-          path: 'userId',
-          select: 'firstName lastName email phone profilePicture' 
-        }).lean(); 
-
-        employee.user = employee.userId;
-        delete employee.userId;
+      const employee = await User.findById(req?.user.id)
+      // console.log(employee);return false
       if (!employee) {
         return res.status(404).json({ 
           success: false, 
           message: 'Employee not found' 
         });
-      }
-      if (employee.user && employee.user.profilePicture) {
-        const baseUrl = process.env.FRONT_BASE_URL || 'http://localhost:5000';          
-          employee.user.profilePicture = `${baseUrl}/${employee.user.profilePicture}`;        
       }
       res.status(200).json({ 
         success: true, 

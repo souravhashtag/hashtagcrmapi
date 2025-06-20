@@ -22,7 +22,8 @@ const roleSchema = new mongoose.Schema({
         {
           name: { type: String },
           slug: { type: String },
-          icon: { type: String }
+          icon: { type: String },
+          submenu:{ type: Array }
         },
     ],
     default: []
