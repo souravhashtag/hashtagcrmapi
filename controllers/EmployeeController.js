@@ -194,10 +194,13 @@ class EmployeeController {
           const birthDate = new Date(employee.dob);
           const birthMonth = birthDate.getMonth() + 1;
           const birthDay = birthDate.getDate();
-          //console.log(birthMonth)
+          let image = '';
+          if(employee?.userId?.profilePicture){
+             image = `${process.env.FRONT_BASE_URL}/${employee?.userId?.profilePicture}`;
+          }
           const employeeData = {
             name: `${employee.userId.firstName} ${employee.userId.lastName}`,
-            image: employee.userId.profilePicture || '', 
+            image: image || '', 
             date: new Date(employee.dob).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).replace(' ', ', ') 
           };
 
