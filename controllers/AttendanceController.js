@@ -58,23 +58,22 @@ class AttendanceController {
       try {
         const pstNow = moment.tz('America/Los_Angeles');
         
-        const pstMidnight = pstNow.clone().startOf('day');
-        const dateField = pstMidnight.toDate();
-
+        // Find the attendance record where clockOut is null (user is still clocked in)
         const record = await Attendance.findOne({
           userId: req.user.id,
-          date: dateField,
-        });
+          clockOut: null  // Find record where user hasn't clocked out yet
+        }).sort({ clockIn: -1 }); // Get the most recent clock-in
 
         if (!record) {
           return res.status(404).json({
             status: 404, 
-            message: 'Clock-in record not found'
+            message: 'No active clock-in record found. Please clock in first.'
           });
         }
 
+        // Update the record with clock-out information
         const clockOutField = pstNow.toDate();
-
+        
         record.clockOut = clockOutField;
         record.clockOutUs = pstNow.format('MM/DD/YYYY hh:mm A z');
         record.calculateTotalHours();
@@ -86,6 +85,7 @@ class AttendanceController {
           data: record
         });
       } catch (err) {
+        console.error('Error clocking out:', err);
         res.status(500).json({
           status: 500,
           message: 'Error clocking out',
@@ -127,18 +127,17 @@ class AttendanceController {
     static takeaBreak = async(req, res) => {       
       try {
           const pstNow = moment.tz('America/Los_Angeles');
-          const pstMidnight = pstNow.clone().startOf('day');
-          const dateField = pstMidnight.toDate();
           
+          // Find active attendance record (where clockOut is null)
           const record = await Attendance.findOne({
               userId: req.user.id,
-              date: dateField,
-          });
+              clockOut: null
+          }).sort({ clockIn: -1 });
           
           if (!record) {
               return res.status(404).json({
                   status: 404, 
-                  message: 'No clock-in record found' 
+                  message: 'No active clock-in record found' 
               });
           }
           
@@ -158,22 +157,20 @@ class AttendanceController {
               error: err.message 
           });
       }
-  }
+    }
     static ResumeWork = async(req, res) => {         
       try {
           const pstNow = moment.tz('America/Los_Angeles');
-          const pstMidnight = pstNow.clone().startOf('day');
-          const dateField = pstMidnight.toDate();
           
           const record = await Attendance.findOne({
               userId: req.user.id,
-              date: dateField,
-          });
+              clockOut: null
+          }).sort({ clockIn: -1 });
           
           if (!record || record.breaks.length === 0) {
               return res.status(404).json({
                   status: 404, 
-                  message: 'No break found to resume' 
+                  message: 'No active break found to resume' 
               });
           }
           
@@ -199,7 +196,7 @@ class AttendanceController {
               error: err.message 
           });
       }
-  }
+    } 
     static GeoLocation = (req, res) => {
         let ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
         console.log(ip)
