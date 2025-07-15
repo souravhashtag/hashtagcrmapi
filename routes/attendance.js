@@ -10,6 +10,7 @@ router.get('/get-individual-attendance', UserController.verifyToken, AttendanceC
 router.get('/take-a-break', UserController.verifyToken, AttendanceController.takeaBreak);
 router.get('/resume-work', UserController.verifyToken, AttendanceController.ResumeWork);
 router.get('/geo-location', AttendanceController.GeoLocation);
+router.get('/date/:date',  UserController.verifyToken,   AttendanceController.getAttendanceByDate);
 
 
 module.exports = router;

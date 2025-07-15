@@ -71,10 +71,7 @@ class UserController {
             //console.log(req.file)
             if (!req.file) {
                 return res.status(400).json({ error: "No file uploaded" });
-              }     
-              // const token = req.headers["authorization"];
-              // const decoded = jwt.verify(token.split(" ")[1], process.env.JWT_SECRET);
-              //console.log(req.user.id)
+              }
               const image = req.file ? req.file.filename : null;
               const screenshot = new ScreenShot({ userid:req.user.id,image });
               const saveimage = await screenshot.save();
@@ -157,10 +154,10 @@ class UserController {
             
             if (token) {
                 const decoded = jwt.decode(token);
-                await BlacklistedToken.create({
-                    token: token,
-                    expiresAt: new Date(decoded.exp * 1000)
-                });
+                // await BlacklistedToken.create({
+                //     token: token,
+                //     expiresAt: new Date(decoded.exp * 1000)
+                // });
             }            
             res.status(200).json({ 
                 success: true, 

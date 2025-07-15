@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 
 const attendanceSchema = new mongoose.Schema({
-  employeeId: {
+  userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Employee',
+    ref: 'User',
     required: true
   },
   date: {
@@ -11,12 +11,16 @@ const attendanceSchema = new mongoose.Schema({
     required: true
   },
   clockIn: Date,
+  clockInUs: String,
   clockOut: Date,
+  clockOutUs: String,
   totalHours: Number,
   breaks: [
     {
       start: Date,
-      end: Date
+      startUs: String,
+      end: Date,
+      endUs: String
     }
   ],
   totalBreakDuration: {
