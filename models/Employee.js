@@ -56,7 +56,7 @@ employeeSchema.pre('save', async function (next) {
     const prefix = 'HBS';
     
     const lastEmployee = await this.constructor.findOne(
-      { employeeId: { $regex: `^${prefix}\\d+$` } },
+      { employeeId: { $regex: `^${prefix}\\d+$` } }, 
       { employeeId: 1 }
     ).sort({ employeeId: -1 });
     
