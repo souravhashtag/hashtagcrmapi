@@ -4,12 +4,15 @@ const bcrypt = require('bcrypt');
 class EmployeeController {
   static async createEmployee(req, res) {
     try {
-      const { userData, ...employeeData } = req.body;
-
-      if (userData) {
+      const { userDatast, employeeDatast } = req.body;      
+      let userData = JSON.parse(userDatast) || {};
+      let employeeData = JSON.parse(employeeDatast) || {};
+      if (userData) {        
+        if (!userData.password) {
+            throw new Error('Password is required');
+        }
         const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
-        
+        const hashedPassword = await bcrypt.hash(userData.password, saltRounds);        
         const userObj = {
           email: userData.email,
           password: hashedPassword,
@@ -21,7 +24,7 @@ class EmployeeController {
           position: userData.position,
           status: userData.status || 'active'
         };
-
+        
         const existingUser = await User.findOne({ email: userData.email });
         if (existingUser) {
           return res.status(400).json({ 
@@ -29,15 +32,15 @@ class EmployeeController {
             message: 'User with this email already exists' 
           });
         }
-
+        
         const user = new User(userObj);
         const savedUser = await user.save();
         
         employeeData.userId = savedUser._id;
       }
 
-      if (employeeData.employeeId) {
-        const existingEmployee = await Employee.findOne({ employeeId: employeeData.employeeId });
+      if (employeeData.userId) {
+        const existingEmployee = await Employee.findOne({ userId: employeeData.userId });
         if (existingEmployee) {
           return res.status(400).json({ 
             success: false, 
@@ -45,7 +48,7 @@ class EmployeeController {
           });
         }
       }
-
+      
       const employee = new Employee(employeeData);
       const savedEmployee = await employee.save();
       
@@ -247,10 +250,7 @@ class EmployeeController {
 
   static async getEmployeeById(req, res) {
     try {
-      const { id } = req.params;
-      
-     
-      
+      const { id } = req.params;      
       // First, get the employee with basic user population
       let employee = await Employee.findById(id).populate('userId');
 
@@ -300,9 +300,10 @@ class EmployeeController {
   static async updateEmployee(req, res) {
     try {
       const { id } = req.params;
-      const { userData, ...employeeData } = req.body;
+      const { userDatast, employeeDatast } = req.body;
 
-      // First, check if employee exists
+      let userData = JSON.parse(userDatast) || {};
+      let employeeData = JSON.parse(employeeDatast) || {};
       const existingEmployee = await Employee.findById(id);
       if (!existingEmployee) {
         return res.status(404).json({
@@ -312,19 +313,33 @@ class EmployeeController {
       }
 
       // Handle profile picture upload
+      let documentUrls = [];
       let profilePictureUrl = null;
-      if (req.file) {
-        // Get the uploaded file path/URL
-        profilePictureUrl = req.file.path || req.file.filename || req.file.location;
+      
+      // console.log('Files received:', userData);return
+      if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        const profilePictures = req.files.filter(file => file.fieldname === 'profilePicture');
+        if (profilePictures.length > 0) {
+          profilePictureUrl = profilePictures[0].path || profilePictures[0].filename;
+        }
+        const documentsFiles = req.files.filter(file => file.fieldname === 'documents[]');
         
-        // You might want to process the path based on your multer config
-        // For example, if storing locally:
-        // profilePictureUrl = `/uploads/profile-pictures/${req.file.filename}`;
-        
-        // Or if using cloud storage, req.file.location might already be the full URL
-        console.log('Profile picture uploaded:', profilePictureUrl);
-      }
+        if (documentsFiles.length > 0) {
+          documentUrls = documentsFiles.map((file, index) => {
+            const metadata = employeeData.documents && employeeData.documents[index] 
+              ? employeeData.documents[index] 
+              : { type: 'other', name: file.originalname };
 
+            return {
+              url: file.path || file.filename,
+              type: metadata.type,
+              name: metadata.name || file.originalname,
+              uploadedAt: new Date()
+            };
+          });
+        }
+      }
+      // console.log('Documents uploaded:', employeeData);
       // Update user data if provided
       if (userData && existingEmployee.userId) {
         const userUpdateData = { ...userData };
@@ -377,7 +392,9 @@ class EmployeeController {
           runValidators: true
         });
       }
-
+      if (documentUrls.length > 0) {
+        employeeData.documents = [...(existingEmployee.documents || []), ...documentUrls];
+      }
       // Check for duplicate employee ID (excluding current employee)
       if (employeeData.employeeId && employeeData.employeeId !== existingEmployee.employeeId) {
         const existingEmpId = await Employee.findOne({
@@ -391,7 +408,7 @@ class EmployeeController {
           });
         }
       }
-
+      // console.log('Updating employee with data:', employeeData);return
       // Update employee data
       const updatedEmployee = await Employee.findByIdAndUpdate(id, employeeData, {
         new: true,

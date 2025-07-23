@@ -3,7 +3,7 @@ const { Schema } = mongoose;
 
 const employeeSchema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  employeeId: { type: String, required: true, unique: true },
+  employeeId: { type: String, unique: true },
   joiningDate: { type: Date, required: true },
   dob:{ type: Date, required: true },
   emergencyContact: {
@@ -49,9 +49,30 @@ const employeeSchema = new Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-employeeSchema.pre('save', function (next) {
+employeeSchema.pre('save', async function (next) {
   this.updatedAt = Date.now();
+  
+  if (!this.employeeId) {
+    const prefix = 'HBS';
+    
+    const lastEmployee = await this.constructor.findOne(
+      { employeeId: { $regex: `^${prefix}\\d+$` } },
+      { employeeId: 1 }
+    ).sort({ employeeId: -1 });
+    
+    let nextNumber = 1;
+    
+    if (lastEmployee) {
+      const lastNumber = parseInt(lastEmployee.employeeId.replace(prefix, ''));
+      nextNumber = lastNumber + 1;
+    }
+    
+    const formattedNumber = nextNumber.toString().padStart(3, '0');
+    this.employeeId = `${prefix}${formattedNumber}`;
+  }
+  
   next();
 });
+
 
 module.exports = mongoose.model('Employee', employeeSchema);

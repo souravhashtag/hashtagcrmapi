@@ -105,8 +105,8 @@ class AttendanceController {
             }).sort({ clockIn: -1 });
             
             if (!record) {
-                return res.status(404).json({
-                    status: 404, 
+                return res.status(200).json({
+                    status: 200, 
                     message: 'Clock-in record not found' 
                 });
             }
