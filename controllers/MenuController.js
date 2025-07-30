@@ -1,4 +1,5 @@
 const Menu = require('../models/Menu');
+const Role = require('../models/Role');
 
 class MenuController {
   static async getAllMenus(req, res) {
@@ -205,7 +206,57 @@ class MenuController {
           message: 'Order must be either 0 or 1'
         });
       }
+      const getUpdatedMenu = await Menu.findById(id);
+      const roles = await Role.find();
+      //console.log('roles', roles);
 
+      for (const role of roles) {
+        let hasChanges = false;
+        
+        if (role?.menulist) {
+          role.menulist = role.menulist.map((menuItem) => {
+            if (menuItem?.slug === getUpdatedMenu?.slug) {
+              hasChanges = true;
+              return {
+                ...menuItem,
+                name: updateData.name,
+                slug: updateData.slug,
+                icon: updateData.icon,
+                // menuId: getUpdatedMenu._id 
+              };
+            }
+            
+            if (menuItem?.submenu && menuItem.submenu.length > 0) {
+              const updatedSubmenu = menuItem.submenu.map((subItem) => {
+                if (subItem?.slug === getUpdatedMenu?.slug) {
+                  hasChanges = true;
+                  // console.log('subItem', subItem);
+                  return {
+                    ...subItem,
+                    name: updateData.name,
+                    slug: updateData.slug,
+                    icon: updateData.icon
+                  };                  
+                }
+                
+                return subItem;
+              });
+              
+              return {
+                ...menuItem,
+                submenu: updatedSubmenu
+              };
+            }
+            
+            return menuItem;
+          });
+          
+          if (hasChanges) {
+            await role.save();
+            // console.log(`Updated role: ${role.name}`);
+          }
+        }
+      }
       const updatedMenu = await Menu.findByIdAndUpdate(
         id,
         updateData,
@@ -253,7 +304,47 @@ class MenuController {
       const childrenCount = await Menu.countDocuments({ 
         parentIds: id 
       });
-      
+      // ==============================================================
+      const roles = await Role.find();
+      //console.log('roles', roles);
+
+      for (const role of roles) {
+        let hasChanges = false;
+        
+        if (role?.menulist) {
+          role.menulist = role.menulist.filter((menuItem) => {
+            // Remove main menu item if it matches the deleted menu slug
+            if (menuItem?.slug === menu?.slug) {
+              hasChanges = true;
+              return false; // Remove this main menu item
+            }
+            
+            if (menuItem?.submenu && menuItem.submenu.length > 0) {
+              const updatedSubmenu = menuItem.submenu.filter((subItem) => {
+                if (subItem?.slug === menu?.slug) {
+                  hasChanges = true;
+                  // console.log('subItem', subItem);
+                  return false; // Remove this submenu item
+                }
+                
+                return true; // Keep this submenu item
+              });
+              
+              // FIXED: Assign the filtered submenu back to menuItem.submenu
+              menuItem.submenu = updatedSubmenu;
+              return true; // Keep this main menu item
+            }
+            
+            return true; // Keep this main menu item
+          });
+          
+          if (hasChanges) {
+            await role.save();
+            // console.log(`Updated role: ${role.name}`);
+          }
+        }
+      }
+      // ==============================================================
       if (childrenCount > 0) {
         return res.status(400).json({
           success: false,

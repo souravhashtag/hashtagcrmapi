@@ -297,11 +297,174 @@ class EmployeeController {
     }
   }
 
+  // static async updateEmployee(req, res) {
+  //   try {
+  //     const { id } = req.params;
+  //     const { userDatast, employeeDatast } = req.body;
+  //     console.log('Received userDatast:', req.body);
+  //     let userData = JSON.parse(userDatast) || {};
+  //     let employeeData = JSON.parse(employeeDatast) || {};
+  //     const existingEmployee = await Employee.findById(id);
+  //     if (!existingEmployee) {
+  //       return res.status(404).json({
+  //         success: false,
+  //         message: 'Employee not found'
+  //       });
+  //     }
+
+  //     // Handle profile picture upload
+  //     let documentUrls = [];
+  //     let profilePictureUrl = null;
+      
+  //      console.log('Files received:', req.files);return
+  //     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+  //       const profilePictures = req.files.filter(file => file.fieldname === 'profilePicture');
+  //       if (profilePictures.length > 0) {
+  //         profilePictureUrl = profilePictures[0].path || profilePictures[0].filename;
+  //       }
+  //       console.log('Profile picture URL:', profilePictureUrl);
+  //       const documentsFiles = req.files.filter(file => file.fieldname === 'documents[]');
+        
+  //       if (documentsFiles.length > 0) {
+  //         documentUrls = documentsFiles.map((file, index) => {
+  //           const metadata = employeeData.documents && employeeData.documents[index] 
+  //             ? employeeData.documents[index] 
+  //             : { type: 'other', name: file.originalname };
+
+  //           return {
+  //             url: file.path || file.filename,
+  //             type: metadata.type,
+  //             name: metadata.name || file.originalname,
+  //             uploadedAt: new Date()
+  //           };
+  //         });
+  //       }
+  //     }
+  //     // console.log('Documents uploaded:', employeeData);
+  //     // Update user data if provided
+  //     if (userData && existingEmployee.userId) {
+  //       const userUpdateData = { ...userData };
+        
+  //       // Add profile picture to user data if uploaded
+  //       if (profilePictureUrl) {
+  //         userUpdateData.profilePicture = profilePictureUrl;
+  //       }
+
+  //       // Hash password if provided
+  //       if (userData.password) {
+  //         const saltRounds = 10;
+  //         userUpdateData.password = await bcrypt.hash(userData.password, saltRounds);
+  //       }
+
+  //       // Handle role and department fields
+  //       if (userData.roleId) {
+  //         userUpdateData.role = userData.roleId;
+  //         delete userUpdateData.roleId;
+  //       }
+  //       if (userData.departmentId) {
+  //         userUpdateData.department = userData.departmentId;
+  //         delete userUpdateData.departmentId;
+  //       }
+
+  //       // Check for duplicate email (excluding current user)
+  //       if (userData.email) {
+  //         const existingUser = await User.findOne({
+  //           email: userData.email,
+  //           _id: { $ne: existingEmployee.userId }
+  //         });
+  //         if (existingUser) {
+  //           return res.status(400).json({
+  //             success: false,
+  //             message: 'Email already exists for another user'
+  //           });
+  //         }
+  //       }
+
+  //       await User.findByIdAndUpdate(existingEmployee.userId, userUpdateData, {
+  //         new: true,
+  //         runValidators: true
+  //       });
+  //     } else if (profilePictureUrl && existingEmployee.userId) {
+  //       // If only profile picture is being updated (no other userData)
+  //       await User.findByIdAndUpdate(existingEmployee.userId, { 
+  //         profilePicture: profilePictureUrl 
+  //       }, {
+  //         new: true,
+  //         runValidators: true
+  //       });
+  //     }
+  //     if (documentUrls.length > 0) {
+  //       employeeData.documents = [...(existingEmployee.documents || []), ...documentUrls];
+  //     }
+  //     // Check for duplicate employee ID (excluding current employee)
+  //     if (employeeData.employeeId && employeeData.employeeId !== existingEmployee.employeeId) {
+  //       const existingEmpId = await Employee.findOne({
+  //         employeeId: employeeData.employeeId,
+  //         _id: { $ne: id }
+  //       });
+  //       if (existingEmpId) {
+  //         return res.status(400).json({
+  //           success: false,
+  //           message: 'Employee ID already exists'
+  //         });
+  //       }
+  //     }
+  //     // console.log('Updating employee with data:', employeeData);return
+  //     // Update employee data
+  //     const updatedEmployee = await Employee.findByIdAndUpdate(id, employeeData, {
+  //       new: true,
+  //       runValidators: true
+  //     }).populate({
+  //       path: 'userId',
+  //       populate: [
+  //         { path: 'role', select: 'name display_name' },
+  //         { path: 'department', select: 'name' }
+  //       ]
+  //     }).populate('performanceReviews.reviewerId', 'firstName lastName');
+
+  //     res.status(200).json({
+  //       success: true,
+  //       data: updatedEmployee,
+  //       message: profilePictureUrl ? 
+  //         'Employee and profile picture updated successfully' : 
+  //         'Employee updated successfully',
+  //       profilePictureUrl: profilePictureUrl // Include the new image URL in response
+  //     });
+
+  //   } catch (error) {
+  //     console.error('Error updating employee:', error);
+
+  //     // Handle validation errors
+  //     if (error.name === 'ValidationError') {
+  //       const validationErrors = Object.values(error.errors).map(err => err.message);
+  //       return res.status(400).json({
+  //         success: false,
+  //         message: 'Validation failed',
+  //         errors: validationErrors
+  //       });
+  //     }
+
+  //     // Handle duplicate key errors
+  //     if (error.code === 11000) {
+  //       const field = Object.keys(error.keyPattern)[0];
+  //       return res.status(400).json({
+  //         success: false,
+  //         message: `${field} already exists`
+  //       });
+  //     }
+
+  //     res.status(400).json({
+  //       success: false,
+  //       message: 'Failed to update employee',
+  //       error: error.message
+  //     });
+  //   }
+  // }
   static async updateEmployee(req, res) {
     try {
       const { id } = req.params;
       const { userDatast, employeeDatast } = req.body;
-
+      console.log('Received userDatast:', req.body);
       let userData = JSON.parse(userDatast) || {};
       let employeeData = JSON.parse(employeeDatast) || {};
       const existingEmployee = await Employee.findById(id);
@@ -316,12 +479,14 @@ class EmployeeController {
       let documentUrls = [];
       let profilePictureUrl = null;
       
-      // console.log('Files received:', userData);return
+      console.log('Files received:', req.files); // Removed the 'return' here
+      
       if (req.files && Array.isArray(req.files) && req.files.length > 0) {
         const profilePictures = req.files.filter(file => file.fieldname === 'profilePicture');
         if (profilePictures.length > 0) {
           profilePictureUrl = profilePictures[0].path || profilePictures[0].filename;
         }
+        console.log('Profile picture URL:', profilePictureUrl);
         const documentsFiles = req.files.filter(file => file.fieldname === 'documents[]');
         
         if (documentsFiles.length > 0) {
@@ -339,7 +504,7 @@ class EmployeeController {
           });
         }
       }
-      // console.log('Documents uploaded:', employeeData);
+      
       // Update user data if provided
       if (userData && existingEmployee.userId) {
         const userUpdateData = { ...userData };
@@ -392,9 +557,12 @@ class EmployeeController {
           runValidators: true
         });
       }
+      
+      // Merge new documents with existing ones
       if (documentUrls.length > 0) {
         employeeData.documents = [...(existingEmployee.documents || []), ...documentUrls];
       }
+      
       // Check for duplicate employee ID (excluding current employee)
       if (employeeData.employeeId && employeeData.employeeId !== existingEmployee.employeeId) {
         const existingEmpId = await Employee.findOne({
@@ -408,7 +576,7 @@ class EmployeeController {
           });
         }
       }
-      // console.log('Updating employee with data:', employeeData);return
+      
       // Update employee data
       const updatedEmployee = await Employee.findByIdAndUpdate(id, employeeData, {
         new: true,
@@ -427,7 +595,7 @@ class EmployeeController {
         message: profilePictureUrl ? 
           'Employee and profile picture updated successfully' : 
           'Employee updated successfully',
-        profilePictureUrl: profilePictureUrl // Include the new image URL in response
+        profilePictureUrl: profilePictureUrl
       });
 
     } catch (error) {
