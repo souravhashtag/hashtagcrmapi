@@ -10,5 +10,6 @@ router.get("/getscreenshot", UserController.verifyToken, UserController.GetScree
 router.get("/deletescreenshot", UserController.DeleteScreenShot);
 router.get("/getuserdata", UserController.verifyToken, UserController.getUserData);
 router.post("/userlogout", UserController.verifyToken, UserController.userLogout);
+// router.get("/tokenprotected", UserController.tokenProtected);
 
 module.exports = router;

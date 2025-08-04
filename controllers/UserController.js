@@ -13,7 +13,8 @@ const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET || 'your_access_token_secret'
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your_refresh_token_secret';
 
 function generateAccessToken(payload) {
-  return jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: "1d" });
+  // return jwt.sign(payload, ACCESS_TOKEN_SECRET, { expiresIn: "1d" });
+  return jwt.sign(payload, ACCESS_TOKEN_SECRET);
 }
 
 function generateRefreshToken(payload) {
@@ -127,6 +128,17 @@ class UserController {
         res.status(401).json({ error: "Invalid or expired token" });
       }
     };
+    // static tokenProtected = async (req, res, next) => {
+    //   const authHeader = req.headers["authorization"];
+    //   const token = authHeader && authHeader.split(' ')[1];
+
+    //   if (!token) return res.sendStatus(401);
+
+    //   jwt.verify(token, ACCESS_TOKEN_SECRET, (err, user) => {
+    //     if (err) return res.sendStatus(403);
+    //     res.json({ message: 'This is protected data', user });
+    //   });
+    // };
     static getUserData = async (req, res) => {
       try {
   
