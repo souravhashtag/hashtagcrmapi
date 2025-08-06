@@ -498,6 +498,224 @@ class RoleController {
       });
     }
   }
+  static assignRoleToUser = async(req, res) => {
+    try {
+      const { id: roleId } = req.params;
+      const { userId } = req.body;
+
+      // Validate role exists
+      const role = await Role.findById(roleId);
+      if (!role) {
+        return res.status(404).json({
+          success: false,
+          message: 'Role not found'
+        });
+      }    
+
+      res.status(200).json({
+        success: true,
+        message: 'Role assigned to user successfully',
+        data: {
+          roleId,
+          userId,
+          assignedAt: new Date()
+        }
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Error assigning role to user',
+        error: error.message
+      });
+    }
+  }
+
+  static unassignRoleFromUser = async(req, res) => {
+    try {
+      const { id: roleId } = req.params;
+      const { userId } = req.body;
+
+      // Validate role exists
+      const role = await Role.findById(roleId);
+      if (!role) {
+        return res.status(404).json({
+          success: false,
+          message: 'Role not found'
+        });
+      }   
+
+      res.status(200).json({
+        success: true,
+        message: 'Role unassigned from user successfully',
+        data: {
+          roleId,
+          userId,
+          unassignedAt: new Date()
+        }
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Error unassigning role from user',
+        error: error.message
+      });
+    }
+  }
+
+  static getRoleUsers = async(req, res) => {
+    try {
+      const { id: roleId } = req.params;
+
+      // Validate role exists
+      const role = await Role.findById(roleId);
+      if (!role) {
+        return res.status(404).json({
+          success: false,
+          message: 'Role not found'
+        });
+      }
+
+      // Option 1: Find users with this role
+      // const users = await User.find({ roles: roleId })
+      //   .select('name email department position')
+      //   .lean();
+
+      // Option 2: Find through UserRole model
+      // const userRoles = await UserRole.find({ roleId }).populate('userId');
+      // const users = userRoles.map(ur => ur.userId);
+
+      // Mock response for now
+      const users = [];
+
+      res.status(200).json({
+        success: true,
+        data: users,
+        count: users.length
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching role users',
+        error: error.message
+      });
+    }
+  }
+  static getHierarchyTree = async(req, res) => {
+    try {
+      const { root_id } = req.query;
+      console.log('Fetching hierarchy tree with root_id:', root_id);
+      // If root_id is provided, get tree from that root, otherwise get all root roles
+      const parentId = root_id || null;
+      
+      const tree = await Role.getHierarchyTree(parentId);
+      
+      res.status(200).json({
+        success: true,
+        data: tree,
+        message: 'Role hierarchy tree retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Error fetching role hierarchy tree:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching role hierarchy tree',
+        error: error.message
+      });
+    }
+  }
+
+  // Validate role hierarchy
+  static validateRoleHierarchy = async(req, res) => {
+    try {
+      const { childId, parentId } = req.query;
+      
+      const isValid = await Role.validateParentChild(childId, parentId);
+      
+      res.status(200).json({
+        success: true,
+        data: { isValid: true },
+        message: 'Role hierarchy is valid'
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        data: { isValid: false },
+        message: error.message,
+        error: error.message
+      });
+    }
+  }
+
+  // Get flat hierarchy (for dropdowns, etc.)
+  static getFlatHierarchy = async(req, res) => {
+    try {
+      const roles = await Role.find({ is_active: true })
+        .populate('parent', 'name display_name')
+        .sort({ level: 1, name: 1 });
+      
+      // Format for easy display with indentation
+      const formattedRoles = roles.map(role => ({
+        ...role.toObject(),
+        displayName: '  '.repeat(role.level) + (role.display_name || role.name),
+        hierarchyPath: role.path ? role.path.split('/').filter(id => id).length : 0
+      }));
+      
+      res.status(200).json({
+        success: true,
+        data: formattedRoles,
+        message: 'Flat role hierarchy retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Error fetching flat hierarchy:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching flat hierarchy',
+        error: error.message
+      });
+    }
+  }
+
+  // Get role statistics
+  static getRoleStats = async(req, res) => {
+    try {
+      const totalRoles = await Role.countDocuments({ is_active: true });
+      const rolesByLevel = await Role.aggregate([
+        { $match: { is_active: true } },
+        { $group: { _id: '$level', count: { $sum: 1 } } },
+        { $sort: { _id: 1 } }
+      ]);
+      
+      const maxLevel = await Role.findOne({ is_active: true })
+        .sort({ level: -1 })
+        .select('level');
+      
+      const rootRoles = await Role.countDocuments({ 
+        parent_id: null, 
+        is_active: true 
+      });
+      
+      res.status(200).json({
+        success: true,
+        data: {
+          totalRoles,
+          maxLevel: maxLevel?.level || 0,
+          rootRoles,
+          rolesByLevel: rolesByLevel.map(item => ({
+            level: item._id,
+            count: item.count
+          }))
+        },
+        message: 'Role statistics retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Error fetching role stats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching role statistics',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = RoleController;

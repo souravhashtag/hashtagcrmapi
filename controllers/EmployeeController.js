@@ -92,20 +92,46 @@ class EmployeeController {
       const { page = 1, limit = 10, search, status, department, role } = req.query;
       const skip = (page - 1) * limit;
 
-      let query = {};
+      let employeeQuery = {};
+      let userQuery = {};
       
       if (search) {
         const regex = new RegExp(search, 'i');
-        query = {
+        
+        // First, find matching users
+        const matchingUsers = await User.find({
+          $or: [
+            { email: regex },
+            { firstName: regex },
+            { lastName: regex },
+            { phone: regex },
+            // Search in concatenated firstName + lastName
+            {
+              $expr: {
+                $regexMatch: {
+                  input: { $concat: ["$firstName", " ", "$lastName"] },
+                  regex: search,
+                  options: "i"
+                }
+              }
+            }
+          ]
+        }, '_id');
+        
+        const matchingUserIds = matchingUsers.map(user => user._id);
+        
+        // Combine employee and user search
+        employeeQuery = {
           $or: [
             { employeeId: regex },
             { 'emergencyContact.name': regex },
-            { 'bankDetails.bankName': regex }
+            { 'bankDetails.bankName': regex },
+            { userId: { $in: matchingUserIds } }
           ]
         };
       }
 
-      const employees = await Employee.find(query)
+      const employees = await Employee.find(employeeQuery)
         .skip(parseInt(skip))
         .limit(parseInt(limit))
         .populate({
@@ -113,7 +139,7 @@ class EmployeeController {
           populate: [
             { 
               path: 'role', 
-              select: 'name display_name',
+              select: 'name display_name level',
               model: 'Role'
             },
             { 
@@ -144,15 +170,16 @@ class EmployeeController {
         filteredEmployees = employees.filter(emp => emp.userId?.role?._id.toString() === role);
       }
 
-      const total = await Employee.countDocuments(query);
+      const total = await Employee.countDocuments(employeeQuery);
       
-    filteredEmployees = filteredEmployees.map(emp => {
-      if (emp.userId && emp.userId.profilePicture) {
-        const baseUrl = process.env.FRONT_BASE_URL || 'http://localhost:5000';
+      filteredEmployees = filteredEmployees.map(emp => {
+        if (emp.userId && emp.userId.profilePicture) {
+          const baseUrl = process.env.FRONT_BASE_URL || 'http://localhost:5000';
           emp.userId.profilePicture = `${baseUrl}/${emp.userId.profilePicture}`;        
-      }
-      return emp; 
-    });
+        }
+        return emp; 
+      });
+
       res.status(200).json({
         success: true,
         data: filteredEmployees,
@@ -265,7 +292,7 @@ class EmployeeController {
       if (employee.userId) {
         await employee.populate({
           path: 'userId.role',
-          select: 'name display_name permissions'
+          select: 'name display_name permissions level'
         });
         
         await employee.populate({
@@ -276,7 +303,7 @@ class EmployeeController {
 
       await employee.populate({
         path: 'performanceReviews.reviewerId',
-        select: 'firstName lastName email'
+        select: 'firstName lastName email status'
       });
 
       // console.log('Employee userId:', employee.userId?._id);
