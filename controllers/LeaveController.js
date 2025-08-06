@@ -133,18 +133,26 @@ class LeaveController {
       } = req.query;
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
-      
+
+      // Find employeeId of logged-in user
+      const currentEmployee = await Employee.findOne({ userId: req.user.id }).select('_id');
+
       // Build query
       const query = {};
-      
+
+      // Exclude logged-in user's own leaves
+      if (currentEmployee) {
+        query.employeeId = { $ne: currentEmployee._id };
+      }
+
       if (status) {
         query.status = status;
       }
-      
+
       if (type) {
         query.type = type;
       }
-      
+
       if (employeeId) {
         query.employeeId = employeeId;
       }
@@ -173,13 +181,13 @@ class LeaveController {
       if (search) {
         filteredLeaves = leaves.filter(leave => {
           const employeeName = `${leave.employeeId?.userId?.firstName || ''} ${leave.employeeId?.userId?.lastName || ''}`.toLowerCase();
-          const employeeId = leave.employeeId?.employeeId?.toLowerCase() || '';
+          const empId = leave.employeeId?.employeeId?.toLowerCase() || '';
           const reason = leave.reason?.toLowerCase() || '';
           const searchLower = search.toLowerCase();
-          
-          return employeeName.includes(searchLower) || 
-                 employeeId.includes(searchLower) || 
-                 reason.includes(searchLower);
+
+          return employeeName.includes(searchLower) ||
+                empId.includes(searchLower) ||
+                reason.includes(searchLower);
         });
       }
 
@@ -205,6 +213,7 @@ class LeaveController {
       });
     }
   }
+
 
   // Get employee's own leaves
   static async getMyLeaves(req, res) {
