@@ -1,6 +1,7 @@
 const Leave = require("../models/Leave");
 const Employee = require("../models/Employee");
 const moment = require('moment');
+const emailService = require("../services/emailService");
 
 class LeaveController {
   // Create leave request
@@ -448,151 +449,124 @@ class LeaveController {
   }
 
   // Get leave statistics
-  static async getLeaveStats(req, res) {
-    try {
-      const totalLeaves = await Leave.countDocuments();
-      const pendingLeaves = await Leave.countDocuments({ status: 'pending' });
-      const approvedLeaves = await Leave.countDocuments({ status: 'approved' });
-      const rejectedLeaves = await Leave.countDocuments({ status: 'rejected' });
-      const casualLeaves = await Leave.countDocuments({ type: 'casual' });
-      const medicalLeaves = await Leave.countDocuments({ type: 'medical' });
+ static async getLeaveStats(req, res) {
+  try {
+    const totalLeaves = await Leave.countDocuments();
+    const pendingLeaves = await Leave.countDocuments({ status: 'pending' });
+    const approvedLeaves = await Leave.countDocuments({ status: 'approved' });
+    const rejectedLeaves = await Leave.countDocuments({ status: 'rejected' });
+    const casualLeaves = await Leave.countDocuments({ type: 'casual' });
+    const medicalLeaves = await Leave.countDocuments({ type: 'medical' });
 
-      res.status(200).json({
-        success: true,
-        data: {
-          totalLeaves,
-          pendingLeaves,
-          approvedLeaves,
-          rejectedLeaves,
-          casualLeaves,
-          medicalLeaves
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching leave stats:', error);
-      res.status(500).json({
+    res.status(200).json({
+      success: true,
+      data: {
+        totalLeaves,
+        pendingLeaves,
+        approvedLeaves,
+        rejectedLeaves,
+        casualLeaves,
+        medicalLeaves
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching leave stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch leave statistics',
+      error: error.message
+    });
+  }
+}
+
+// Get leave balance for employee
+static async getLeaveBalance(req, res) {
+  try {
+    const { employeeId } = req.params;
+
+    // Find employee
+    const employee = employeeId
+      ? await Employee.findById(employeeId)
+      : await Employee.findOne({ userId: req.user.id });
+
+    if (!employee) {
+      return res.status(404).json({
         success: false,
-        message: 'Failed to fetch leave statistics',
-        error: error.message
+        message: 'Employee not found'
       });
     }
-  }
 
-  // Get leave balance for employee
-  static async getLeaveBalance(req, res) {
-    try {
-      const { employeeId } = req.params;
+    const currentYear = new Date().getFullYear();
+    const yearStart = new Date(currentYear, 0, 1);
+    const yearEnd = new Date(currentYear, 11, 31);
+
+    // Default leave allocations
+    const leaveAllocations = {
+      casual: 9,
+      medical: 9
+    };
+
+    // Function to calculate used leave by type - FIXED VERSION
+    const getUsedLeaves = async (type) => {
+      const result = await Leave.aggregate([
+        {
+          $match: {
+            employeeId: employee._id,
+            type,
+            status: 'approved',
+            startDate: { $lte: yearEnd },
+            endDate: { $gte: yearStart }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$totalDays' }
+          }
+        }
+      ]);
       
-      let employee;
-      if (employeeId) {
-        employee = await Employee.findById(employeeId);
-      } else {
-        employee = await Employee.findOne({ userId: req.user.id });
+      // Return the exact sum without rounding to preserve decimal values (0.5, 1.5, etc.)
+      return result[0]?.total || 0;
+    };
+
+    const casualTaken = await getUsedLeaves('casual');
+    const medicalTaken = await getUsedLeaves('medical');
+
+    // Calculate remaining leaves (can be negative if over-allocated)
+    const casualRemaining = leaveAllocations.casual - casualTaken;
+    const medicalRemaining = leaveAllocations.medical - medicalTaken;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        casualLeaves: {
+          total: leaveAllocations.casual,
+          used: casualTaken,
+          remaining: Math.max(0, casualRemaining) // Prevent negative display, but keep actual calculation
+        },
+        medicalLeaves: {
+          total: leaveAllocations.medical,
+          used: medicalTaken,
+          remaining: Math.max(0, medicalRemaining) // Prevent negative display, but keep actual calculation
+        },
+        // Optional: Include raw remaining (can be negative) for internal logic
+        _internal: {
+          casualRemainingRaw: casualRemaining,
+          medicalRemainingRaw: medicalRemaining
+        }
       }
-
-      if (!employee) {
-        return res.status(404).json({
-          success: false,
-          message: 'Employee not found'
-        });
-      }
-
-      const currentYear = new Date().getFullYear();
-      const yearStart = new Date(currentYear, 0, 1);
-      const yearEnd = new Date(currentYear, 11, 31);
-
-      // Calculate used leaves by type
-      const casualUsed = await Leave.aggregate([
-        {
-          $match: {
-            employeeId: employee._id,
-            type: 'casual',
-            status: 'approved',
-            startDate: { $gte: yearStart, $lte: yearEnd }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: '$totalDays' }
-          }
-        }
-      ]);
-
-      const medicalUsed = await Leave.aggregate([
-        {
-          $match: {
-            employeeId: employee._id,
-            type: 'medical',
-            status: 'approved',
-            startDate: { $gte: yearStart, $lte: yearEnd }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: '$totalDays' }
-          }
-        }
-      ]);
-
-      const annualUsed = await Leave.aggregate([
-        {
-          $match: {
-            employeeId: employee._id,
-            type: 'annual',
-            status: 'approved',
-            startDate: { $gte: yearStart, $lte: yearEnd }
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: '$totalDays' }
-          }
-        }
-      ]);
-
-      // Default leave allocations (can be made configurable)
-      const leaveAllocations = {
-        casual: 12,
-        medical: 10,
-        annual: 21
-      };
-
-      const casualTaken = casualUsed[0]?.total || 0;
-      const medicalTaken = medicalUsed[0]?.total || 0;
-      const annualTaken = annualUsed[0]?.total || 0;
-
-      res.status(200).json({
-        success: true,
-        data: {
-          casualLeaves: {
-            total: leaveAllocations.casual,
-            used: casualTaken,
-            remaining: leaveAllocations.casual - casualTaken
-          },
-          medicalLeaves: {
-            total: leaveAllocations.medical,
-            used: medicalTaken,
-            remaining: leaveAllocations.medical - medicalTaken
-          },
-          annualLeaves: {
-            total: leaveAllocations.annual,
-            used: annualTaken,
-            remaining: leaveAllocations.annual - annualTaken
-          }
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching leave balance:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch leave balance',
-        error: error.message
-      });
-    }
+    });
+  } catch (error) {
+    console.error('Error fetching leave balance:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch leave balance',
+      error: error.message
+    });
   }
+}
+
 }
 
 module.exports = LeaveController;

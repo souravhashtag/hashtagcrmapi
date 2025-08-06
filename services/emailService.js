@@ -5,7 +5,7 @@ const Employee = require('../models/Employee');
 
 class EmailService {
   constructor() {
-    this.transporter = nodemailer.createTransporter({
+    this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: process.env.SMTP_PORT || 587,
       secure: false, // true for 465, false for other ports
@@ -222,7 +222,7 @@ class EmailService {
         <style>
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
+          .header { background: linear-gradient(135deg, #129990 0%, #117ca7ff 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
           .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
           .leave-details { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
           .detail-row { display: flex; justify-content: space-between; margin: 10px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
@@ -247,32 +247,32 @@ class EmailService {
               <h3>📋 Leave Request Details</h3>
               
               <div class="detail-row">
-                <span class="label">Employee Name:</span>
+                <span class="label">Employee Name: </span>
                 <span class="value">${employeeName}</span>
               </div>
               
               <div class="detail-row">
-                <span class="label">Employee ID:</span>
+                <span class="label">Employee ID: </span>
                 <span class="value">${employeeId}</span>
               </div>
               
               <div class="detail-row">
-                <span class="label">Leave Type:</span>
+                <span class="label">Leave Type: </span>
                 <span class="value">${leaveTypeMap[leave.type] || leave.type}</span>
               </div>
               
               <div class="detail-row">
-                <span class="label">Start Date:</span>
+                <span class="label">Start Date: </span>
                 <span class="value">${formatDate(leave.startDate)}</span>
               </div>
               
               <div class="detail-row">
-                <span class="label">End Date:</span>
+                <span class="label">End Date: </span>
                 <span class="value">${formatDate(leave.endDate)}</span>
               </div>
               
               <div class="detail-row">
-                <span class="label">Total Days:</span>
+                <span class="label">Total Days: </span>
                 <span class="value">${leave.totalDays} day${leave.totalDays !== 1 ? 's' : ''}</span>
               </div>
               
@@ -284,7 +284,7 @@ class EmailService {
               </div>
               
               <div class="detail-row">
-                <span class="label">Applied On:</span>
+                <span class="label">Applied On: </span>
                 <span class="value">${formatDate(leave.createdAt || new Date())}</span>
               </div>
             </div>
@@ -306,14 +306,14 @@ class EmailService {
             ${isNotification ? `
             <div style="text-align: center; margin: 30px 0;">
               <p><strong>Action Required:</strong> Please review and respond to this leave request.</p>
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/leaves" class="button">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/leave" class="button">
                 Review Leave Request
               </a>
             </div>
             ` : `
             <div style="text-align: center; margin: 30px 0;">
               <p><strong>Next Steps:</strong> Your leave request is now under review. You will be notified once a decision is made.</p>
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/leaves" class="button">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/leave" class="button">
                 View My Leaves
               </a>
             </div>
