@@ -121,7 +121,7 @@ class LeaveController {
   }
 
   // Get all leaves (HR view with filters and pagination)
-  static async getAllLeaves(req, res) {
+ static async getAllLeaves(req, res) {
     try {
       const {
         page = 1,
@@ -129,81 +129,186 @@ class LeaveController {
         search = '',
         status = '',
         type = '',
-        employeeId = ''
+        employeeId = '',
+        startDate = '',
+        endDate = '',
+        department = '',
+        includeOwn = 'true', // New parameter to control if user sees their own leaves
+        sortBy = 'createdAt',
+        sortOrder = 'desc'
       } = req.query;
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      // Find employeeId of logged-in user
+      // Find employeeId of logged-in user for reference
       const currentEmployee = await Employee.findOne({ userId: req.user.id }).select('_id');
 
-      // Build query
+      // Build query object
       const query = {};
 
-      // Exclude logged-in user's own leaves
-      if (currentEmployee) {
+      // UPDATED: Include or exclude current user's leaves based on parameter
+      if (includeOwn === 'false' && currentEmployee) {
         query.employeeId = { $ne: currentEmployee._id };
       }
 
+      // Filter by status
       if (status) {
         query.status = status;
       }
 
+      // Filter by leave type
       if (type) {
         query.type = type;
       }
 
+      // Filter by specific employee
       if (employeeId) {
         query.employeeId = employeeId;
       }
 
-      // Get leaves with pagination
-      const leaves = await Leave.find(query)
+      // Filter by date range
+      if (startDate || endDate) {
+        query.$and = query.$and || [];
+        
+        if (startDate) {
+          query.$and.push({
+            startDate: { $gte: new Date(startDate) }
+          });
+        }
+        
+        if (endDate) {
+          query.$and.push({
+            endDate: { $lte: new Date(endDate) }
+          });
+        }
+      }
+
+      // Enhanced population with department info
+      let leavesQuery = Leave.find(query)
         .populate([
           {
             path: 'employeeId',
             populate: {
               path: 'userId',
-              select: 'firstName lastName email'
-            }
+              select: 'firstName lastName email phone department role',
+              populate: [
+                { path: 'department', select: 'name code' },
+                { path: 'role', select: 'name' }
+              ]
+            },
+            select: 'employeeId joiningDate'
           },
           {
             path: 'approvedBy',
-            select: 'firstName lastName'
+            select: 'firstName lastName email'
           }
-        ])
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit));
+        ]);
 
-      // Filter by search if provided
-      let filteredLeaves = leaves;
+      // Apply sorting
+      const sortOptions = {};
+      sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+      leavesQuery = leavesQuery.sort(sortOptions);
+
+      // Get all leaves first (for accurate search)
+      const allLeaves = await leavesQuery.exec();
+
+      // Enhanced search functionality
+      let filteredLeaves = allLeaves;
       if (search) {
-        filteredLeaves = leaves.filter(leave => {
+        const searchLower = search.toLowerCase();
+        
+        filteredLeaves = allLeaves.filter(leave => {
+          // Employee name search
           const employeeName = `${leave.employeeId?.userId?.firstName || ''} ${leave.employeeId?.userId?.lastName || ''}`.toLowerCase();
+          
+          // Employee ID search
           const empId = leave.employeeId?.employeeId?.toLowerCase() || '';
+          
+          // Email search
+          const email = leave.employeeId?.userId?.email?.toLowerCase() || '';
+          
+          // Reason search
           const reason = leave.reason?.toLowerCase() || '';
-          const searchLower = search.toLowerCase();
+          
+          // Department search
+          const departmentName = leave.employeeId?.userId?.department?.name?.toLowerCase() || '';
+          
+          // Role search
+          const roleName = leave.employeeId?.userId?.role?.name?.toLowerCase() || '';
+          
+          // Leave type search
+          const leaveType = leave.type?.toLowerCase() || '';
+          
+          // Status search
+          const leaveStatus = leave.status?.toLowerCase() || '';
 
           return employeeName.includes(searchLower) ||
-                empId.includes(searchLower) ||
-                reason.includes(searchLower);
+                 empId.includes(searchLower) ||
+                 email.includes(searchLower) ||
+                 reason.includes(searchLower) ||
+                 departmentName.includes(searchLower) ||
+                 roleName.includes(searchLower) ||
+                 leaveType.includes(searchLower) ||
+                 leaveStatus.includes(searchLower);
         });
       }
 
-      const totalItems = await Leave.countDocuments(query);
-      const totalPages = Math.ceil(totalItems / parseInt(limit));
+      // Filter by department if specified
+      if (department) {
+        filteredLeaves = filteredLeaves.filter(leave => 
+          leave.employeeId?.userId?.department?.name?.toLowerCase().includes(department.toLowerCase()) ||
+          leave.employeeId?.userId?.department?.code?.toLowerCase().includes(department.toLowerCase())
+        );
+      }
+
+      // Apply pagination to filtered results
+      const paginatedLeaves = filteredLeaves.slice(skip, skip + parseInt(limit));
+
+      // Get total count for pagination (based on filtered results)
+      const totalFilteredItems = filteredLeaves.length;
+      const totalPages = Math.ceil(totalFilteredItems / parseInt(limit));
+
+      // Get total count without filters for statistics
+      const totalAllLeaves = await Leave.countDocuments({});
+      const totalCurrentUserLeaves = currentEmployee ? await Leave.countDocuments({ employeeId: currentEmployee._id }) : 0;
+
+      // Calculate statistics
+      const statistics = {
+        total: totalAllLeaves,
+        currentUserLeaves: totalCurrentUserLeaves,
+        otherUsersLeaves: totalAllLeaves - totalCurrentUserLeaves,
+        pending: await Leave.countDocuments({ status: 'pending' }),
+        approved: await Leave.countDocuments({ status: 'approved' }),
+        rejected: await Leave.countDocuments({ status: 'rejected' }),
+        cancelled: await Leave.countDocuments({ status: 'cancelled' })
+      };
 
       res.status(200).json({
         success: true,
-        data: filteredLeaves,
+        data: paginatedLeaves,
         pagination: {
           currentPage: parseInt(page),
           totalPages,
-          totalItems,
-          itemsPerPage: parseInt(limit)
-        }
+          totalItems: totalFilteredItems,
+          itemsPerPage: parseInt(limit),
+          hasNextPage: parseInt(page) < totalPages,
+          hasPrevPage: parseInt(page) > 1
+        },
+        filters: {
+          search,
+          status,
+          type,
+          employeeId,
+          startDate,
+          endDate,
+          department,
+          includeOwn: includeOwn === 'true',
+          sortBy,
+          sortOrder
+        },
+        statistics
       });
+
     } catch (error) {
       console.error('Error fetching leaves:', error);
       res.status(500).json({
@@ -213,6 +318,7 @@ class LeaveController {
       });
     }
   }
+
 
 
   // Get employee's own leaves
