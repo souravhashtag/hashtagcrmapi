@@ -5,168 +5,248 @@ const emailService = require("../services/emailService");
 
 class LeaveController {
   // Create leave request
-  static async createLeave(req, res) {
-  try {
-    const { type, startDate, endDate, reason, isHalfDay, emailOptions } = req.body;
-    
-    // Find employee by user ID
-    const employee = await Employee.findOne({ userId: req.user.id }).populate('userId');
-    if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: 'Employee record not found'
-      });
-    }
-
-    // Parse dates
-    const start = moment(startDate).startOf('day');
-    const end = moment(endDate).startOf('day');
-    
-    // Validate date range
-    if (end.isBefore(start)) {
-      return res.status(400).json({
-        success: false,
-        message: 'End date cannot be before start date'
-      });
-    }
-
-    // Check if it's a half day leave
-    const halfDay = isHalfDay === true || isHalfDay === 'true' || isHalfDay === '1';
-    
-    // Calculate total days
-    let totalDays;
-    if (halfDay) {
-      // For half day, start and end date should be the same
-      if (!start.isSame(end, 'day')) {
-        return res.status(400).json({
+   static async createLeave(req, res) {
+    try {
+      const { type, startDate, endDate, reason, isHalfDay, emailOptions } = req.body;
+      
+      // Find employee by user ID
+      const employee = await Employee.findOne({ userId: req.user.id }).populate('userId');
+      if (!employee) {
+        return res.status(404).json({
           success: false,
-          message: 'Half day leave must have the same start and end date'
+          message: 'Employee record not found'
         });
       }
-      totalDays = 0.5;
-    } else {
-      totalDays = end.diff(start, 'days') + 1;
-    }
 
-    // Check for overlapping leaves - comprehensive overlap detection
-    const overlappingLeave = await Leave.findOne({
-      employeeId: employee._id,
-      status: { $in: ['pending', 'approved'] },
-      $and: [
-        {
-          $or: [
-            // Case 1: Existing leave starts before or on the requested start date
-            // and ends after or on the requested start date
-            {
-              startDate: { $lte: start.toDate() },
-              endDate: { $gte: start.toDate() }
-            },
-            // Case 2: Existing leave starts before or on the requested end date
-            // and ends after or on the requested end date
-            {
-              startDate: { $lte: end.toDate() },
-              endDate: { $gte: end.toDate() }
-            },
-            // Case 3: Existing leave is completely within the requested period
-            {
-              startDate: { $gte: start.toDate() },
-              endDate: { $lte: end.toDate() }
-            },
-            // Case 4: Requested leave is completely within existing leave
-            {
-              startDate: { $lte: start.toDate() },
-              endDate: { $gte: end.toDate() }
-            }
-          ]
-        }
-      ]
-    });
-
-    if (overlappingLeave) {
-      // Format dates for better error message
-      const existingStart = moment(overlappingLeave.startDate).format('YYYY-MM-DD');
-      const existingEnd = moment(overlappingLeave.endDate).format('YYYY-MM-DD');
+      // Parse and validate dates
+      const start = moment(startDate).startOf('day');
+      const end = moment(endDate).startOf('day');
       
-      return res.status(400).json({
-        success: false,
-        message: `Leave request conflicts with existing ${overlappingLeave.status} leave from ${existingStart} to ${existingEnd}`,
-        conflictingLeave: {
-          id: overlappingLeave._id,
-          type: overlappingLeave.type,
-          startDate: existingStart,
-          endDate: existingEnd,
-          status: overlappingLeave.status
+      // Basic date validation
+      if (!start.isValid() || !end.isValid()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid date format. Please use YYYY-MM-DD format'
+        });
+      }
+
+      // Check if trying to create leave in the past (allow today)
+      const today = moment().startOf('day');
+      if (start.isBefore(today)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot create leave requests for past dates'
+        });
+      }
+      
+      // Validate date range
+      if (end.isBefore(start)) {
+        return res.status(400).json({
+          success: false,
+          message: 'End date cannot be before start date'
+        });
+      }
+
+      // Check if it's a half day leave
+      const halfDay = isHalfDay === true || isHalfDay === 'true' || isHalfDay === '1';
+      
+      // Calculate total days
+      let totalDays;
+      if (halfDay) {
+        // For half day, start and end date should be the same
+        if (!start.isSame(end, 'day')) {
+          return res.status(400).json({
+            success: false,
+            message: 'Half day leave must have the same start and end date'
+          });
+        }
+        totalDays = 0.5;
+      } else {
+        totalDays = end.diff(start, 'days') + 1;
+      }
+
+      // ENHANCED OVERLAP DETECTION
+      console.log(`🔍 Checking for overlaps: ${start.format('YYYY-MM-DD')} to ${end.format('YYYY-MM-DD')}`);
+      
+      // Find all existing leaves that could potentially overlap
+      const existingLeaves = await Leave.find({
+        employeeId: employee._id,
+        status: { $in: ['pending', 'approved'] }, // Don't check against rejected/cancelled leaves
+        $or: [
+          // ANY part of the requested period overlaps with existing leaves
+          {
+            // Existing leave starts during requested period
+            startDate: {
+              $gte: start.toDate(),
+              $lte: end.toDate()
+            }
+          },
+          {
+            // Existing leave ends during requested period  
+            endDate: {
+              $gte: start.toDate(),
+              $lte: end.toDate()
+            }
+          },
+          {
+            // Existing leave completely encompasses requested period
+            $and: [
+              { startDate: { $lte: start.toDate() } },
+              { endDate: { $gte: end.toDate() } }
+            ]
+          },
+          {
+            // Requested period completely encompasses existing leave
+            $and: [
+              { startDate: { $gte: start.toDate() } },
+              { endDate: { $lte: end.toDate() } }
+            ]
+          }
+        ]
+      }).sort({ startDate: 1 });
+
+      console.log(`📋 Found ${existingLeaves.length} potentially overlapping leaves`);
+
+      // Additional validation: Check each existing leave for exact overlap
+      const overlappingLeaves = existingLeaves.filter(existingLeave => {
+        const existingStart = moment(existingLeave.startDate).startOf('day');
+        const existingEnd = moment(existingLeave.endDate).startOf('day');
+        
+        console.log(`🔎 Checking against: ${existingStart.format('YYYY-MM-DD')} to ${existingEnd.format('YYYY-MM-DD')} (${existingLeave.status})`);
+        
+        // Check for any form of overlap
+        const hasOverlap = (
+          // Case 1: New leave starts during existing leave
+          (start.isSameOrAfter(existingStart) && start.isSameOrBefore(existingEnd)) ||
+          // Case 2: New leave ends during existing leave
+          (end.isSameOrAfter(existingStart) && end.isSameOrBefore(existingEnd)) ||
+          // Case 3: New leave completely encompasses existing leave
+          (start.isSameOrBefore(existingStart) && end.isSameOrAfter(existingEnd)) ||
+          // Case 4: Existing leave completely encompasses new leave
+          (existingStart.isSameOrBefore(start) && existingEnd.isSameOrAfter(end))
+        );
+
+        if (hasOverlap) {
+          console.log(`❌ OVERLAP DETECTED with leave: ${existingLeave._id}`);
+        }
+
+        return hasOverlap;
+      });
+
+      if (overlappingLeaves.length > 0) {
+        const conflictingLeave = overlappingLeaves[0];
+        const existingStart = moment(conflictingLeave.startDate).format('YYYY-MM-DD');
+        const existingEnd = moment(conflictingLeave.endDate).format('YYYY-MM-DD');
+        
+        return res.status(400).json({
+          success: false,
+          message: `❌ Leave request conflicts with existing ${conflictingLeave.status} leave from ${existingStart} to ${existingEnd}. You cannot create overlapping leave requests.`,
+          conflictingLeave: {
+            id: conflictingLeave._id,
+            type: conflictingLeave.type,
+            startDate: existingStart,
+            endDate: existingEnd,
+            status: conflictingLeave.status,
+            totalDays: conflictingLeave.totalDays,
+            reason: conflictingLeave.reason
+          },
+          requestedPeriod: {
+            startDate: start.format('YYYY-MM-DD'),
+            endDate: end.format('YYYY-MM-DD'),
+            totalDays: totalDays
+          }
+        });
+      }
+
+      console.log(`✅ No overlaps found. Creating leave request.`);
+
+      // Additional business rule validations
+      // await LeaveController.validateBusinessRules(employee, type, totalDays, start, end);
+
+      // Handle file attachments if any
+      let attachments = [];
+      if (req.files && req.files.length > 0) {
+        attachments = req.files.map(file => ({
+          name: file.originalname,
+          url: file.path,
+          uploadedAt: new Date()
+        }));
+      }
+
+      // Create the leave request
+      const leave = new Leave({
+        employeeId: employee._id,
+        type: type.toLowerCase(),
+        startDate: start.toDate(),
+        endDate: end.toDate(),
+        totalDays,
+        reason,
+        attachments,
+        status: 'pending',
+        createdAt: new Date()
+      });
+
+      await leave.save();
+      await leave.populate([
+        {
+          path: 'employeeId',
+          populate: {
+            path: 'userId',
+            select: 'firstName lastName email department role',
+            populate: [
+              { path: 'department', select: 'name' },
+              { path: 'role', select: 'name' }
+            ]
+          }
+        }
+      ]);
+
+      // Send email notifications
+      try {
+        // Parse email options from request body
+        const emailNotificationOptions = emailOptions ? JSON.parse(emailOptions) : {};
+        
+        // Send leave application notification
+        await emailService.sendLeaveApplicationNotification(
+          leave,
+          employee,
+          {
+            additionalTo: emailNotificationOptions.additionalTo || [],
+            cc: emailNotificationOptions.cc || [],
+            bcc: emailNotificationOptions.bcc || [],
+            notifyHR: true,
+            notifyManager: true
+          }
+        );
+
+        console.log('✅ Leave application email notification sent successfully');
+      } catch (emailError) {
+        console.error('❌ Email notification failed:', emailError);
+        // Don't fail the request if email fails
+      }
+
+      res.status(201).json({
+        success: true,
+        message: '🎉 Leave request submitted successfully and notifications sent',
+        data: leave,
+        summary: {
+          employeeName: `${employee.userId.firstName} ${employee.userId.lastName}`,
+          leaveType: type,
+          period: `${start.format('YYYY-MM-DD')} to ${end.format('YYYY-MM-DD')}`,
+          totalDays: totalDays,
+          status: 'pending'
         }
       });
+
+    } catch (error) {
+      console.error('❌ Error creating leave:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create leave request',
+        error: error.message
+      });
     }
-
-    // Handle file attachments if any
-    let attachments = [];
-    if (req.files && req.files.length > 0) {
-      attachments = req.files.map(file => ({
-        name: file.originalname,
-        url: file.path,
-        uploadedAt: new Date()
-      }));
-    }
-
-    // Create the leave request
-    const leave = new Leave({
-      employeeId: employee._id,
-      type: type.toLowerCase(),
-      startDate: start.toDate(),
-      endDate: end.toDate(),
-      totalDays,
-      reason,
-      attachments,
-      status: 'pending'
-    });
-
-    await leave.save();
-    await leave.populate([
-      {
-        path: 'employeeId',
-        populate: {
-          path: 'userId',
-          select: 'firstName lastName email'
-        }
-      }
-    ]);
-
-    // Send email notifications
-    try {
-      // Parse email options from request body
-      const emailNotificationOptions = emailOptions ? JSON.parse(emailOptions) : {};
-      
-      // Send leave application notification
-      await emailService.sendLeaveApplicationNotification(
-        leave,
-        employee,
-        {
-          additionalTo: emailNotificationOptions.additionalTo || [],
-          cc: emailNotificationOptions.cc || [],
-          bcc: emailNotificationOptions.bcc || []
-        }
-      );
-    } catch (emailError) {
-      console.error('Email notification failed:', emailError);
-      // Don't fail the request if email fails
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Leave request submitted successfully',
-      data: leave
-    });
-  } catch (error) {
-    console.error('Error creating leave:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create leave request',
-      error: error.message
-    });
   }
-}
 
   // Get all leaves (HR view with filters and pagination)
  static async getAllLeaves(req, res) {
