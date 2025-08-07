@@ -271,6 +271,7 @@ class AssignmentController {
 
   // Get assigned employees for a supervisor
   static async getAssignedEmployees(req, res) {
+    console.log('Fetching assigned employees for supervisor:', req.params.supervisorId);
     try {
       const { supervisorId } = req.params;
       const { status = 'active', page = 1, limit = 10 } = req.query;
