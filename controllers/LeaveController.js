@@ -358,6 +358,41 @@ class LeaveController {
         }
       ]);
 
+
+       try {
+        if (status === 'approved') {
+          await emailService.sendLeaveApprovalNotification(
+            updatedLeave,                    // leave object
+            updatedLeave.employeeId,         // employee object  
+            updatedLeave.approvedBy,         // approver object
+            {                                // options
+              notifyHR: true,
+              additionalTo: [],
+              cc: [],
+              bcc: []
+            }
+          );
+          console.log('✅ Leave approval email sent successfully');
+        } else if (status === 'rejected') {
+          await emailService.sendLeaveRejectionNotification(
+            updatedLeave,                    // leave object
+            updatedLeave.employeeId,         // employee object  
+            updatedLeave.approvedBy,         // approver object
+            {                                // options
+              notifyHR: true,
+              additionalTo: [],
+              cc: [],
+              bcc: []
+            }
+          );
+          console.log('✅ Leave rejection email sent successfully');
+        }
+      } catch (emailError) {
+        // Log email error but don't fail the response
+        console.error('❌ Error sending email notification:', emailError);
+        // You might want to save this error to a notification queue for retry
+      }
+
       res.status(200).json({
         success: true,
         message: `Leave ${status} successfully`,
@@ -374,11 +409,28 @@ class LeaveController {
   }
 
   // Cancel leave request
-  static async cancelLeave(req, res) {
+static async cancelLeave(req, res) {
     try {
       const { id } = req.params;
 
-      const leave = await Leave.findById(id);
+      // Find the leave with detailed population
+      const leave = await Leave.findById(id)
+        .populate({
+          path: 'employeeId',
+          populate: {
+            path: 'userId',
+            select: 'firstName lastName email phone department role',
+            populate: [
+              { path: 'department', select: 'name' },
+              { path: 'role', select: 'name' }
+            ]
+          }
+        })
+        .populate({
+          path: 'approvedBy',
+          select: 'firstName lastName email'
+        });
+
       if (!leave) {
         return res.status(404).json({
           success: false,
@@ -388,13 +440,14 @@ class LeaveController {
 
       // Find employee to check ownership
       const employee = await Employee.findOne({ userId: req.user.id });
-      if (!employee || !leave.employeeId.equals(employee._id)) {
+      if (!employee || !leave.employeeId._id.equals(employee._id)) {
         return res.status(403).json({
           success: false,
           message: 'You can only cancel your own leave requests'
         });
       }
 
+      // Check if leave can be cancelled
       if (leave.status === 'approved') {
         return res.status(400).json({
           success: false,
@@ -402,22 +455,57 @@ class LeaveController {
         });
       }
 
+      if (leave.status === 'cancelled') {
+        return res.status(400).json({
+          success: false,
+          message: 'Leave is already cancelled'
+        });
+      }
+
+      // Update leave status
       const updatedLeave = await Leave.findByIdAndUpdate(
         id,
-        { status: 'cancelled' },
+        { 
+          status: 'cancelled',
+          updatedAt: new Date()
+        },
         { new: true }
       ).populate([
         {
+          path: 'employeeId',
+          populate: {
+            path: 'userId',
+            select: 'firstName lastName email phone department role',
+            populate: [
+              { path: 'department', select: 'name' },
+              { path: 'role', select: 'name' }
+            ]
+          }
+        },
+        {
           path: 'approvedBy',
-          select: 'firstName lastName'
+          select: 'firstName lastName email'
         }
       ]);
 
+      // Send email notifications
+    //  await emailService.sendLeaveRejectionNotification(
+    //     updatedLeave,                    // leave object
+    //     updatedLeave.employeeId,         // employee object  
+    //     updatedLeave.approvedBy,         // approver object
+    //     {                                // options
+    //       notifyHR: true,
+    //       additionalTo: [],
+    //       cc: [],
+    //       bcc: []
+    //     }
+    //   );
       res.status(200).json({
         success: true,
         message: 'Leave cancelled successfully',
         data: updatedLeave
       });
+
     } catch (error) {
       console.error('Error cancelling leave:', error);
       res.status(500).json({

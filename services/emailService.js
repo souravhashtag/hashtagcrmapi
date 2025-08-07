@@ -144,7 +144,7 @@ class EmailService {
   }
 
   // Send leave rejection notification
-  async sendLeaveRejectionNotification(leave, employee, approver, options = {}) {
+   async sendLeaveRejectionNotification(leave, employee, approver, options = {}) {
     try {
       const {
         additionalTo = [],
