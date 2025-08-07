@@ -1,7 +1,102 @@
 const Employee = require('../models/Employee');
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
+
+
+const isCurrentMonth = (date) => {
+  const now = new Date();
+  const inputDate = new Date(date);
+  return (
+    inputDate.getFullYear() === now.getFullYear() &&
+    inputDate.getMonth() === now.getMonth()
+  );
+};
+
+const transformToNewMember = (employee) => ({
+  id: employee._id,
+  name: `${employee.userId?.firstName || ''} ${employee.userId?.lastName || ''}`,
+  email: employee.userId?.email || '',
+  joinDate: employee.joinDate,
+  department: employee.department || '',
+  designation: employee.designation || ''
+});
+
 class EmployeeController {
+
+
+static getNewMembers = async (req, res) => {
+  try {
+    const allEmployees = await Employee.find(); // Fetch from DB
+
+    const newMembers = allEmployees
+      .filter(employee => isCurrentMonth(employee.joinDate))
+      .map(transformToNewMember);
+
+    const response = {
+      success: true,
+      data: newMembers,
+      total: newMembers.length,
+      month: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    };
+
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching new members',
+      error: error.message
+    });
+  }
+};
+
+
+  // Get new members by specific month/year
+  static getNewMembersByMonth = async (req, res) => {
+  try {
+    const { year, month } = req.params;
+    const targetYear = parseInt(year);
+    const targetMonth = parseInt(month) - 1; // JS months are 0-indexed
+
+    if (isNaN(targetYear) || isNaN(targetMonth) || targetMonth < 0 || targetMonth > 11) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid year or month parameter'
+      });
+    }
+
+    const allEmployees = await Employee.find(); // Fetch from DB
+
+    const newMembers = allEmployees
+      .filter(employee => {
+        const joinDate = new Date(employee.joinDate);
+        return (
+          joinDate.getFullYear() === targetYear &&
+          joinDate.getMonth() === targetMonth
+        );
+      })
+      .map(transformToNewMember);
+
+    res.json({
+      success: true,
+      data: newMembers,
+      total: newMembers.length,
+      month: new Date(targetYear, targetMonth).toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric'
+      })
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching new members for specified month',
+      error: error.message
+    });
+  }
+};
+
+
+
+  
   static async createEmployee(req, res) {
     try {
       const { userDatast, employeeDatast } = req.body;      
