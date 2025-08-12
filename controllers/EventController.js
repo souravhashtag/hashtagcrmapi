@@ -23,7 +23,7 @@ class EventLogger {
       });
 
       const savedEvent = await event.save();
-      console.log(`📝 Event logged: ${event_type} for user ${userId}`);
+      // console.log(`📝 Event logged: ${event_type} for user ${userId}`);
       
       return {
         success: true,
@@ -37,7 +37,120 @@ class EventLogger {
       };
     }
   }
+  static async generateEventsFromDatabase(userId, year, month) {
+    try {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      
+      const events = await Event.find({
+        userId: userId,
+        event_date: {
+          $gte: startDate,
+          $lt: new Date(year, month, 1)
+        }
+      }).sort({ event_date: 1 });
 
+      const eventsMap = {};
+      const daysInMonth = endDate.getDate();
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        eventsMap[day] = { type: '', label: '' };
+      }
+
+      events.forEach(event => {
+        const day = event.event_date.getDate();
+        
+        if (eventsMap[day].label === '') {
+          eventsMap[day].label = event.event_description;
+          eventsMap[day].type = event.event_type;
+          // eventsMap[day].color = (event?.event_type=='Leave' ? 'red' : (event?.event_type=='Holiday' ? 'green' : 'blue'));
+        } else {
+          eventsMap[day].label += ', ' + event.event_description;        
+        }
+      });
+      
+      return eventsMap;
+
+    } catch (error) {
+      console.error('Error generating events from database:', error);
+      throw error;
+    }
+  }
+
+  static async generateEventsFromDatabaseAggregated(userId, year, month) {
+    try {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      
+      const aggregatedEvents = await Event.aggregate([
+        {
+          $match: {
+            userId: new mongoose.Types.ObjectId(userId),
+            event_date: {
+              $gte: startDate,
+              $lt: new Date(year, month, 1)
+            }
+          }
+        },
+        {
+          $group: {
+            _id: { $dayOfMonth: '$event_date' },
+            descriptions: { $push: '$event_description' },
+            types: { $push: '$event_type' },
+            firstType: { $first: '$event_type' }
+          }
+        }
+      ]);
+
+      const eventsMap = {};
+      const daysInMonth = endDate.getDate();
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        eventsMap[day] = { type: '', label: '' };
+      }
+
+      aggregatedEvents.forEach(item => {
+        const day = item._id;
+        eventsMap[day] = {
+          type: item.firstType,
+          label: item.descriptions.join(', ')
+        };
+      });
+
+      return eventsMap;
+
+    } catch (error) {
+      console.error('Error generating events with aggregation:', error);
+      throw error;
+    }
+  }
+
+  static async getCalenderData(req, res) {
+    // console.log("Fetching calendar data for user:", req);
+    const { id } = req.user; 
+    const { year,month } = req?.params; 
+    try {   
+      const userId = id;
+      // const year = year;
+      // const month = month; 
+      // console.log(`Fetching calendar data for user ${userId} for ${year}-${month}`);
+      // Use EventLogger.methodName for static methods
+      const eventsMap = await EventLogger.generateEventsFromDatabase(userId, year, month);   
+      // console.log(`📅 Calendar data for user :`, eventsMap);  
+      res.status(200).json({ 
+          status: 200, 
+          message: 'Calender Data', 
+          data: eventsMap 
+      });
+      
+    } catch (error) {
+      console.error('Error in example:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
 }
 
 module.exports = EventLogger;
