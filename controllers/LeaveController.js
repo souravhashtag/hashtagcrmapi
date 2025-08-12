@@ -2,10 +2,30 @@ const Leave = require("../models/Leave");
 const Employee = require("../models/Employee");
 const moment = require('moment');
 const emailService = require("../services/emailService");
-const LeaveType = require("../models/leaveType");
+const LeaveType = require("../models/LeaveType");
 const EventLogger = require("./EventController");
 
+
+
+
+function getFinancialYearRange(date = new Date()) {
+  // FY starts on April 1
+  const year = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
+  const start = new Date(year, 3, 1, 0, 0, 0, 0);           // Apr 1, 00:00:00
+  const end = new Date(year + 1, 2, 31, 23, 59, 59, 999);   // Mar 31, 23:59:59
+  return { start, end, label: `${year}-${(year + 1).toString().slice(-2)}` };
+}
+
+function getPrevFinancialYearRange(date = new Date()) {
+  const { start } = getFinancialYearRange(date);
+  const prevEnd = new Date(start.getTime() - 1); // one millisecond before current FY start
+  return getFinancialYearRange(prevEnd);
+}
+
+
+
 class LeaveController {
+
   // Create leave request
   static async createLeave(req, res) {
     try {
@@ -646,6 +666,7 @@ class LeaveController {
         }
 
         // Log event for each date
+        // Log event for each date
         const logPromises = dates.map(date => {
           const formattedDate = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
 
@@ -653,7 +674,7 @@ class LeaveController {
             event_date: formattedDate,
             event_description: `Leave ${status.charAt(0).toUpperCase() + status.slice(1)}`,
             event_type: "Leave",
-            userId: req.user.id,
+            userId: updatedLeave.employeeId.userId._id, // Get userId from employee schema
             leaveId: updatedLeave._id, // Optional: reference to the leave record
             employeeId: updatedLeave.employeeId._id // Optional: reference to the employee
           });
@@ -948,7 +969,7 @@ class LeaveController {
   static async createLeaveType(req, res) {
 
     try {
-      const { name, leaveCount, ispaidLeave } = req.body;
+      const { name, leaveCount, ispaidLeave, carryforward } = req.body;
 
       // Validation
       if (!name || name.trim() === '') {
@@ -980,10 +1001,16 @@ class LeaveController {
 
 
       // Create new leave type
+      // const leaveType = new LeaveType({
+      //   name: name.trim(),
+      //   leaveCount: leaveCount || 0,
+      //   ispaidLeave: ispaidLeave === true || ispaidLeave === 'true' || ispaidLeave === '1',
+      // });
       const leaveType = new LeaveType({
         name: name.trim(),
         leaveCount: leaveCount || 0,
         ispaidLeave: ispaidLeave === true || ispaidLeave === 'true' || ispaidLeave === '1',
+        carryforward: carryforward === true || carryforward === 'true' || carryforward === '1'
       });
 
       await leaveType.save();
@@ -1125,7 +1152,15 @@ class LeaveController {
   static async updateLeaveType(req, res) {
     try {
       const { id } = req.params;
-      const { name, leaveCount, ispaidLeave } = req.body;
+      const { name, leaveCount, ispaidLeave, carryforward } = req.body;
+      // Update fields
+      const updateData = {
+        updatedAt: new Date()
+      };
+
+      if (carryforward !== undefined) {
+        updateData.carryforward = carryforward === true || carryforward === 'true' || carryforward === '1';
+      }
 
       const leaveType = await LeaveType.findById(id);
       if (!leaveType) {
@@ -1165,11 +1200,6 @@ class LeaveController {
           message: 'Leave count must be a non-negative number'
         });
       }
-
-      // Update fields
-      const updateData = {
-        updatedAt: new Date()
-      };
 
       if (name) updateData.name = name.trim();
       if (leaveCount !== undefined) updateData.leaveCount = leaveCount;
@@ -1252,7 +1282,7 @@ class LeaveController {
   static async getActiveLeaveTypes(req, res) {
     try {
       const leaveTypes = await LeaveType.find()
-        .select('name leaveCount ispaidLeave')
+        .select('name leaveCount ispaidLeave carryforward')
         .sort({ name: 1 });
 
       // Transform for frontend use
@@ -1262,7 +1292,8 @@ class LeaveController {
         displayName: type.name,
         leaveCount: type.leaveCount,
         isPaid: type.ispaidLeave,
-        color: getLeaveTypeColor(type.name) // Helper function to assign colors
+        carryforward: type.carryforward,
+        color: getLeaveTypeColor(type.name)
       }));
 
       res.status(200).json({

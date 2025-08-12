@@ -9,7 +9,11 @@ const LeaveTypeSchema = new Schema({
   },
   leaveCount: {
     type: Number,
-    default: 0 
+    default: 0
+  },
+  carryforward: {
+    type: Boolean,
+    default: true
   },
   ispaidLeave: {
     type: Boolean,
