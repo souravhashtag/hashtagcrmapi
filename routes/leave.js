@@ -25,6 +25,12 @@ router.get('/balance', LeaveController.getLeaveBalance);
 // // Get leave balance for specific employee (HR use)
 // router.get('/balance/:employeeId', LeaveController.getLeaveBalance);
 
+// Leave type management routes
+router.post('/type', LeaveController.createLeaveType);
+router.get('/type', LeaveController.getAllLeaveTypes);
+
+
+
 // // Get single leave by ID
 router.get('/:id', LeaveController.getLeaveById);
 
