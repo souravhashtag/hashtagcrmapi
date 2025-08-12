@@ -2,7 +2,7 @@ const Leave = require("../models/Leave");
 const Employee = require("../models/Employee");
 const moment = require('moment');
 const emailService = require("../services/emailService");
-const LeaveType = require("../models/leaveType");
+const LeaveType = require("../models/LeaveType");
 const EventLogger = require("./EventController");
 
 class LeaveController {

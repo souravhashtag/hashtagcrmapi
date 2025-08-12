@@ -23,7 +23,7 @@ class EventLogger {
       });
 
       const savedEvent = await event.save();
-      console.log(`📝 Event logged: ${event_type} for user ${userId}`);
+      // console.log(`📝 Event logged: ${event_type} for user ${userId}`);
       
       return {
         success: true,
@@ -133,7 +133,7 @@ class EventLogger {
       const userId = id;
       // const year = year;
       // const month = month; 
-      console.log(`Fetching calendar data for user ${userId} for ${year}-${month}`);
+      // console.log(`Fetching calendar data for user ${userId} for ${year}-${month}`);
       // Use EventLogger.methodName for static methods
       const eventsMap = await EventLogger.generateEventsFromDatabase(userId, year, month);   
       // console.log(`📅 Calendar data for user :`, eventsMap);  
