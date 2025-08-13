@@ -22,7 +22,8 @@ exports.createHoliday = async (req, res) => {
       const eventData = {
         event_date: dateYMD,
         event_type: 'Holiday',
-        refId: savedHoliday._id
+        refId: savedHoliday._id,
+        event_description: savedHoliday.description
       };
 
       // Debug logging to see what we're sending

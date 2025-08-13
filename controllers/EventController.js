@@ -18,7 +18,7 @@ class EventLogger {
 
       const event = new Event({
         event_date,
-        ...(event_description && { event_description }),
+        event_description,
         event_type,
         ...(userId && { userId }),
         ...(refId && { refId })
