@@ -574,7 +574,7 @@ class EmployeeController {
     try {
       const { id } = req.params;
       const { userDatast, employeeDatast } = req.body;
-      console.log('Received userDatast:', req.body);
+      // console.log('Received userDatast:', req.body);
       let userData = JSON.parse(userDatast) || {};
       let employeeData = JSON.parse(employeeDatast) || {};
       const existingEmployee = await Employee.findById(id);

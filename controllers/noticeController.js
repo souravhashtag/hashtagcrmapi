@@ -7,50 +7,26 @@ class NoticeController {
       const {
         page = 1,
         limit = 10,
-        status = 'published',
-        category,
-        priority,
-        search,
-        userId,
+        status = 'published',        
         sortBy = 'createdAt',
-        sortOrder = 'desc'
+        sortOrder = 'desc',
+        search
       } = req.query;
 
+      // Simple filter based on your schema
       const filter = {
-        isActive: true,
         status: status
       };
 
-      // Add filters
-      if (category && category !== 'all') filter.category = category;
-      if (priority && priority !== 'all') filter.priority = priority;
-      
       // Search functionality
-      if (search) {
+      if (search && search.trim()) {
         filter.$or = [
-          { title: { $regex: search, $options: 'i' } },
-          { content: { $regex: search, $options: 'i' } },
-          { authorName: { $regex: search, $options: 'i' } }
+          { content: { $regex: search.trim(), $options: 'i' } }
         ];
       }
 
-      // Check for expired notices
-      const now = new Date();
-      filter.$or = [
-        { expiryDate: null },
-        { expiryDate: { $gt: now } }
-      ];
-
       const sortOptions = {};
       sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
-      
-      // If sorting by priority, add custom sort logic
-      if (sortBy === 'priority') {
-        sortOptions.isPinned = -1; // Pinned first
-        sortOptions.priority = 1; // Then by priority
-      } else {
-        sortOptions.isPinned = -1; // Always show pinned first
-      }
 
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -63,18 +39,6 @@ class NoticeController {
           .lean(),
         Notice.countDocuments(filter)
       ]);
-
-      // Add user-specific data if userId provided
-      if (userId) {
-        notices.forEach(notice => {
-          notice.isReadByUser = notice.readBy.some(
-            read => read.userId.toString() === userId
-          );
-          notice.isLikedByUser = notice.likes.some(
-            like => like.userId.toString() === userId
-          );
-        });
-      }
 
       res.json({
         success: true,
@@ -146,34 +110,19 @@ class NoticeController {
   static async createNotice(req, res) {
     try {
       const {
-        title,
         content,
-        priority,
-        category,
         status,
-        isPinned,
-        expiryDate,
-        targetAudience,
-        authorName
       } = req.body;
-
-      const { userId } = req.user || req.body; // Assuming user from auth middleware
-
+      console.log("Creating notice with content:", req.body);
+      const { id } = req.user || req.body; // Assuming user from auth middleware
       const notice = new Notice({
-        title,
         content,
-        priority,
-        category,
-        author: userId,
-        authorName,
         status,
-        isPinned,
-        expiryDate: expiryDate ? new Date(expiryDate) : null,
-        targetAudience: targetAudience || ['all']
+        author: id,
       });
 
       const savedNotice = await notice.save();
-      await savedNotice.populate('author', 'name email');
+    //   await savedNotice.populate('author', 'name email');
 
       res.status(201).json({
         success: true,
@@ -233,10 +182,8 @@ class NoticeController {
     try {
       const { id } = req.params;
 
-      const notice = await Notice.findByIdAndUpdate(
+      const notice = await Notice.findByIdAndDelete(
         id,
-        { isActive: false },
-        { new: true }
       );
 
       if (!notice) {

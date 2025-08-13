@@ -140,103 +140,101 @@ roleSchema.pre('save', async function(next) {
 });
 
 // Pre-update middleware for updateOne/updateMany
-roleSchema.pre(['updateOne', 'findOneAndUpdate'], async function(next) {
-  //console.log('*** ENTERED PRE-UPDATE HOOK ***');
-  try {
-    const update = this.getUpdate();
-    //console.log('Update query received:', JSON.stringify(update, null, 2));
-    //console.log('Query filter:', JSON.stringify(this.getQuery(), null, 2));
+// roleSchema.pre(['updateOne', 'findOneAndUpdate'], async function(next) {
+//   //console.log('*** ENTERED PRE-UPDATE HOOK ***');
+//   try {
+//     const update = this.getUpdate();
+    
 
-    // Check if parent_id is being updated
-    let newParentId = null;
-    if (update.$set && 'parent_id' in update.$set) {
-      newParentId = update.$set.parent_id;
-      //console.log(`Detected parent_id in $set: ${newParentId}`);
-    } else if (update.parent_id !== undefined) {
-      newParentId = update.parent_id;
-      //console.log(`Detected parent_id directly: ${newParentId}`);
-    } else {
-      //console.log('No parent_id update detected in query');
-    }
+//     // Check if parent_id is being updated
+//     let newParentId = null;
+//     if (update.$set && 'parent_id' in update.$set) {
+//       newParentId = update.$set.parent_id;
+//       //console.log(`Detected parent_id in $set: ${newParentId}`);
+//     } else if (update.parent_id !== undefined) {
+//       newParentId = update.parent_id;
+//     } else {
+//       //console.log('No parent_id update detected in query');
+//     }
 
-    if (newParentId !== null || update.$set?.parent_id === null) {
-      //console.log('Processing parent_id update for role');
-      const doc = await this.model.findOne(this.getQuery()).select('level path _id name');
-      if (!doc) {
-        //console.log('Role not found for update');
-        throw new Error(`Role not found for query: ${JSON.stringify(this.getQuery())}`);
-      }
+//     if (newParentId !== null || update.$set?.parent_id === null) {
+//       //console.log('Processing parent_id update for role');
+//       const doc = await this.model.findOne(this.getQuery()).select('level path _id name');
+//       if (!doc) {
+//         //console.log('Role not found for update');
+//         throw new Error(`Role not found for query: ${JSON.stringify(this.getQuery())}`);
+//       }
 
-      //console.log(`Updating role ${doc.name} (${doc._id}), current level: ${doc.level}, current path: ${doc.path}, new parent_id: ${newParentId}`);
+//       //console.log(`Updating role ${doc.name} (${doc._id}), current level: ${doc.level}, current path: ${doc.path}, new parent_id: ${newParentId}`);
 
-      // Validate parent-child relationship
-      if (newParentId) {
-        //console.log(`Validating parent-child relationship for child ${doc._id} and parent ${newParentId}`);
-        await this.model.validateParentChild(doc._id, newParentId);
-      }
+//       // Validate parent-child relationship
+//       if (newParentId) {
+//         //console.log(`Validating parent-child relationship for child ${doc._id} and parent ${newParentId}`);
+//         await this.model.validateParentChild(doc._id, newParentId);
+//       }
 
-      // Calculate new level and path
-      let newLevel = 0;
-      let newPath = '';
-      if (newParentId) {
-        const parent = await this.model.findById(newParentId).select('level path');
-        if (!parent) {
-          //console.log(`Parent role not found: ${newParentId}`);
-          throw new Error(`Parent role not found: ${newParentId}`);
-        }
-        newLevel = parent.level + 1;
-        newPath = parent.path ? `${parent.path}/${parent._id}` : `/${parent._id}`;
-        //console.log(`Calculated new level: ${newLevel}, new path: ${newPath}`);
-      } else {
-        //console.log('Setting role as root (no parent)');
-        newLevel = 0;
-        newPath = '';
-      }
+//       // Calculate new level and path
+//       let newLevel = 0;
+//       let newPath = '';
+//       if (newParentId) {
+//         const parent = await this.model.findById(newParentId).select('level path');
+//         if (!parent) {
+//           //console.log(`Parent role not found: ${newParentId}`);
+//           throw new Error(`Parent role not found: ${newParentId}`);
+//         }
+//         newLevel = parent.level + 1;
+//         newPath = parent.path ? `${parent.path}/${parent._id}` : `/${parent._id}`;
+//         //console.log(`Calculated new level: ${newLevel}, new path: ${newPath}`);
+//       } else {
+//         //console.log('Setting role as root (no parent)');
+//         newLevel = 0;
+//         newPath = '';
+//       }
 
-      // Merge with existing $set or create new one
-      const updateFields = { ...update.$set, level: newLevel, path: newPath };
-      //console.log(`Setting update with level: ${newLevel}, path: ${newPath} for role ${doc.name} (${doc._id})`);
-      this.setUpdate({ $set: updateFields });
+//       // Merge with existing $set or create new one
+//       const updateFields = { ...update.$set, level: newLevel, path: newPath };
+//       //console.log(`Setting update with level: ${newLevel}, path: ${newPath} for role ${doc.name} (${doc._id})`);
+//       this.setUpdate({ $set: updateFields });
 
-      // Update descendants
-      //console.log(`Checking for descendants of role ${doc.name} (${doc._id})`);
-      const descendants = await this.model.find({
-        path: new RegExp(`^${doc.path}/${doc._id}`)
-      });
+//       // Update descendants
+//       //console.log(`Checking for descendants of role ${doc.name} (${doc._id})`);
+//       const descendants = await this.model.find({
+//         path: new RegExp(`^${doc.path}/${doc._id}`)
+//       });
 
-      if (descendants.length > 0) {
-        console.log(`Found ${descendants.length} descendants to update`);
-        for (const descendant of descendants) {
-          const levelDiff = newLevel - doc.level;
-          const newDescendantPath = descendant.path.replace(
-            new RegExp(`^${doc.path}/${doc._id}`),
-            `${newPath}/${doc._id}`
-          );
+//       if (descendants.length > 0) {
+//         console.log(`Found ${descendants.length} descendants to update`);
+//         for (const descendant of descendants) {
+//           const levelDiff = newLevel - doc.level;
+//           const newDescendantPath = descendant.path.replace(
+//             new RegExp(`^${doc.path}/${doc._id}`),
+//             `${newPath}/${doc._id}`
+//           );
 
-          await this.model.updateOne(
-            { _id: descendant._id },
-            {
-              $set: {
-                level: descendant.level + levelDiff,
-                path: newDescendantPath
-              }
-            }
-          );
-          //console.log(`Updated descendant ${descendant.name}: level=${descendant.level + levelDiff}, path=${newDescendantPath}`);
-        }
-      } else {
-        // console.log('No descendants found to update');
-      }
-    } else {
-      // console.log('No parent_id update detected, skipping level recalculation');
-    }
-    // console.log('*** EXITING PRE-UPDATE HOOK ***');
-    next();
-  } catch (error) {
-    console.error('Error in pre-update hook:', error);
-    next(error);
-  }
-});
+//           await this.model.updateOne(
+//             { _id: descendant._id },
+//             {
+//               $set: {
+//                 level: descendant.level + levelDiff,
+//                 path: newDescendantPath
+//               }
+//             }
+//           );
+//           //console.log(`Updated descendant ${descendant.name}: level=${descendant.level + levelDiff}, path=${newDescendantPath}`);
+//         }
+//       } else {
+//         // console.log('No descendants found to update');
+//       }
+//     } else {
+//       // console.log('No parent_id update detected, skipping level recalculation');
+//     }
+//     // console.log('*** EXITING PRE-UPDATE HOOK ***');
+//     next();
+//   } catch (error) {
+//     console.error('Error in pre-update hook:', error);
+//     next(error);
+//   }
+// });
 
 // Helper method to manually recalculate level and path
 roleSchema.statics.recalculateLevelAndPath = async function(roleId) {

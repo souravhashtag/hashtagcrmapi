@@ -156,7 +156,7 @@ class RoleController {
     try {
       const { id } = req.params;
       const { name, display_name, description, menulist, parent_id } = req.body;
-
+      // console.log('Updating role with ID:', id, 'Data:', req.body);return
       // Check if role exists
       const role = await Role.findById(id);
       if (!role) {
@@ -181,7 +181,8 @@ class RoleController {
       if (parent_id !== undefined && parent_id !== role.parent_id?.toString()) {
         await Role.validateParentChild(id, parent_id);
       }
-
+      // console.log('Parent ID:', parent_id);return
+      // console.log('Updating role with parent ID:', parentId);return
       const updatedRole = await Role.findByIdAndUpdate(
         id,
         {
@@ -189,11 +190,12 @@ class RoleController {
           display_name,
           description,
           menulist,
-          parent_id: parent_id === '' ? null : parent_id
+          parent_id:  parent_id
         },
         { new: true, runValidators: true }
-      ).populate('parent', 'name display_name');
-
+      )
+      .populate('parent', 'name display_name');
+      // console.log('Updated Role:', updatedRole);return
       res.status(200).json({
         success: true,
         message: 'Role updated successfully',
