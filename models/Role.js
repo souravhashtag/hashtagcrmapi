@@ -144,8 +144,7 @@ roleSchema.pre(['updateOne', 'findOneAndUpdate'], async function(next) {
   //console.log('*** ENTERED PRE-UPDATE HOOK ***');
   try {
     const update = this.getUpdate();
-    //console.log('Update query received:', JSON.stringify(update, null, 2));
-    //console.log('Query filter:', JSON.stringify(this.getQuery(), null, 2));
+    
 
     // Check if parent_id is being updated
     let newParentId = null;
@@ -154,7 +153,6 @@ roleSchema.pre(['updateOne', 'findOneAndUpdate'], async function(next) {
       //console.log(`Detected parent_id in $set: ${newParentId}`);
     } else if (update.parent_id !== undefined) {
       newParentId = update.parent_id;
-      //console.log(`Detected parent_id directly: ${newParentId}`);
     } else {
       //console.log('No parent_id update detected in query');
     }

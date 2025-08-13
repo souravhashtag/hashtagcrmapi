@@ -176,7 +176,7 @@ class MenuController {
     try {
       const { id } = req.params;
       const updateData = req.body;
-
+      
       // Validate parents exist if parentIds is being updated
       if (updateData.parentIds && updateData.parentIds.length > 0) {
         // Check for self-reference
@@ -197,6 +197,8 @@ class MenuController {
             message: 'One or more parent menus not found'
           });
         }
+      }else {
+        updateData.parentIds = [];
       }
 
       // Validate order value if being updated
@@ -208,7 +210,7 @@ class MenuController {
       }
       const getUpdatedMenu = await Menu.findById(id);
       const roles = await Role.find();
-      //console.log('roles', roles);
+      // console.log('getUpdatedMenu', getUpdatedMenu);return
 
       for (const role of roles) {
         let hasChanges = false;
@@ -257,13 +259,14 @@ class MenuController {
           }
         }
       }
+      // console.log('Update data:', updateData);return
       const updatedMenu = await Menu.findByIdAndUpdate(
         id,
         updateData,
         { new: true, runValidators: true }
       )
-      .populate('parentIds', 'name slug')
-      .populate('createdBy', 'firstName lastName');
+      // .populate('parentIds', 'name slug')
+      // .populate('createdBy', 'firstName lastName');
 
       if (!updatedMenu) {
         return res.status(404).json({

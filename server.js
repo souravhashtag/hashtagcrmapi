@@ -36,7 +36,7 @@ app.use("/api/V1/designations", designationRoutes);
 app.use("/api/V1/leave", leaveRoutes);
 app.use("/api/V1/assignments", assignmentRoutes);
 app.use("/api/V1/events", eventRoutes);
-app.use("/api/V1/notice", noticeRoutes);
+app.use("/api/V1/notices", noticeRoutes);
 
 const PORT = process.env.PORT || 5000;
 mongoose

@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const NoticeController = require('../controllers/noticeController');
-
+const UserController = require("../controllers/UserController");
 // Public routes
-router.get('/', NoticeController.getAllNotices);
-router.get('/:id', NoticeController.getNoticeById);
+router.get('/', UserController.verifyToken, NoticeController.getAllNotices);
+router.get('/:id', UserController.verifyToken, NoticeController.getNoticeById);
 
-router.post('/', NoticeController.createNotice);
-router.put('/:id', NoticeController.updateNotice);
-router.delete('/:id', NoticeController.deleteNotice);
+router.post('/', UserController.verifyToken, NoticeController.createNotice);
+router.put('/:id', UserController.verifyToken, NoticeController.updateNotice);
+router.delete('/:id', UserController.verifyToken, NoticeController.deleteNotice);
 
 module.exports = router;
