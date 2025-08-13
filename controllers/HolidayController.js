@@ -22,7 +22,7 @@ exports.createHoliday = async (req, res) => {
         event_date: dateYMD,
         event_description: `Holiday Created: ${savedHoliday.name}`,
         event_type: 'Holiday',
-        userId: req.user?._id?.toString() || req.user?.id?.toString(),
+        userId: null,
       };
 
       // Debug logging to see what we're sending
