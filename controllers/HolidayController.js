@@ -21,17 +21,16 @@ exports.createHoliday = async (req, res) => {
       const eventData = {
         event_date: dateYMD,
         event_description: `Holiday Created: ${savedHoliday.name}`,
-        event_type: 'Holiday',
-        userId: null,
+        event_type: 'Holiday'
       };
 
       // Debug logging to see what we're sending
       console.log('🔍 Attempting to log event with data:', eventData);
 
       // Validate required fields before calling
-      if (!eventData.event_description || !eventData.event_type || !eventData.userId) {
+      if (!eventData.event_description || !eventData.event_type) {
         throw new Error(`Missing required fields: ${Object.entries(eventData)
-          .filter(([key, value]) => !value && ['event_description', 'event_type', 'userId'].includes(key))
+          .filter(([key, value]) => !value && ['event_description', 'event_type'].includes(key))
           .map(([key]) => key)
           .join(', ')
           }`);
@@ -45,8 +44,7 @@ exports.createHoliday = async (req, res) => {
       console.error('📋 Event data was:', {
         event_date: dateYMD,
         event_description: `Holiday Created: ${savedHoliday.name}`,
-        event_type: 'Holiday',
-        userId: req.user?._id?.toString() || req.user?.id?.toString(),
+        event_type: 'Holiday'
       });
     }
 
