@@ -22,7 +22,7 @@ exports.createHoliday = async (req, res) => {
         event_date: dateYMD,
         event_description: `Holiday Created: ${savedHoliday.name}`,
         event_type: 'Holiday',
-        userId: req.user?._id?.toString() || req.user?.id?.toString(), 
+        userId: req.user?._id?.toString() || req.user?.id?.toString(),
       };
 
       // Debug logging to see what we're sending
@@ -31,9 +31,9 @@ exports.createHoliday = async (req, res) => {
       // Validate required fields before calling
       if (!eventData.event_description || !eventData.event_type || !eventData.userId) {
         throw new Error(`Missing required fields: ${Object.entries(eventData)
-            .filter(([key, value]) => !value && ['event_description', 'event_type', 'userId'].includes(key))
-            .map(([key]) => key)
-            .join(', ')
+          .filter(([key, value]) => !value && ['event_description', 'event_type', 'userId'].includes(key))
+          .map(([key]) => key)
+          .join(', ')
           }`);
       }
 
@@ -61,10 +61,86 @@ exports.createHoliday = async (req, res) => {
 // Get all holidays
 exports.getAllHolidays = async (req, res) => {
   try {
-    const holidays = await Holiday.find().sort({ date: 1 });
-    res.status(200).json(holidays);
+    // Extract query parameters
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      type,
+      includePast = false
+    } = req.query;
+
+    // Convert to numbers
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build filter object
+    const filter = {};
+
+    // Search filter - searches in name and description
+    if (search && search.trim()) {
+      filter.$or = [
+        { name: { $regex: search.trim(), $options: 'i' } },
+        { description: { $regex: search.trim(), $options: 'i' } }
+      ];
+    }
+
+    // Type filter
+    if (type && type !== 'all') {
+      filter.type = type;
+    }
+
+    // Date filter - exclude past holidays unless explicitly requested
+    if (!includePast || includePast === 'false') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of today
+      const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+      filter.date = { $gte: todayString };
+    }
+
+    // Get total count for pagination
+    const totalItems = await Holiday.countDocuments(filter);
+    const totalPages = Math.ceil(totalItems / limitNum);
+
+    // Get holidays with filters, sorting, and pagination
+    const holidays = await Holiday.find(filter)
+      .sort({ date: 1, name: 1 }) // Sort by date first, then by name
+      .skip(skip)
+      .limit(limitNum)
+      .lean(); // Use lean() for better performance when you don't need Mongoose document methods
+
+    // Calculate pagination info
+    const pagination = {
+      currentPage: pageNum,
+      totalPages,
+      totalItems,
+      hasNextPage: pageNum < totalPages,
+      hasPrevPage: pageNum > 1,
+      nextPage: pageNum < totalPages ? pageNum + 1 : null,
+      prevPage: pageNum > 1 ? pageNum - 1 : null
+    };
+
+    // Response format that matches your frontend expectations
+    res.status(200).json({
+      success: true,
+      data: holidays,
+      pagination,
+      filters: {
+        search: search || null,
+        type: type || 'all',
+        includePast: includePast === 'true'
+      }
+    });
+
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in getAllHolidays:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      message: 'Failed to fetch holidays'
+    });
   }
 };
 
