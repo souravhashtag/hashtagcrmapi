@@ -7,19 +7,21 @@ class EventLogger {
         event_date,
         event_description,
         event_type,
-        userId
+        userId,
+        refId
       } = eventData;
 
       // Validate required fields
-      if (!event_description || !event_type) {
-        throw new Error('Missing required fields: event_description, event_type are required');
+      if (!event_type) {
+        throw new Error('Missing required fields: event_type are required');
       }
 
       const event = new Event({
         event_date,
-        event_description,
+        ...(event_description && { event_description }),
         event_type,
-        ...(userId && { userId })
+        ...(userId && { userId }),
+        ...(refId && { refId })
       });
 
       const savedEvent = await event.save();
