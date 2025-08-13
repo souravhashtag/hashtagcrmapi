@@ -1,16 +1,62 @@
-// controllers/holidayController.js
-const Holiday = require('../models/Holiday');
+const { Holiday } = require('../models/Holiday');
+const EventLogger = require('./EventController');
 
 // Create new holiday
 exports.createHoliday = async (req, res) => {
   try {
     const holiday = new Holiday(req.body);
     const savedHoliday = await holiday.save();
+
+    // Ensure YYYY-MM-DD format
+    const toYMD = (d) => {
+      const dt = d instanceof Date ? d : new Date(d);
+      return dt.toISOString().split('T')[0];
+    };
+
+    const dateYMD = toYMD(savedHoliday.date);
+
+    // Log event creation - improved error handling
+    try {
+      // Make sure all required fields are properly set
+      const eventData = {
+        event_date: dateYMD,
+        event_description: `Holiday Created: ${savedHoliday.name}`,
+        event_type: 'Holiday',
+        userId: req.user?._id?.toString() || req.user?.id?.toString(), 
+      };
+
+      // Debug logging to see what we're sending
+      console.log('🔍 Attempting to log event with data:', eventData);
+
+      // Validate required fields before calling
+      if (!eventData.event_description || !eventData.event_type || !eventData.userId) {
+        throw new Error(`Missing required fields: ${Object.entries(eventData)
+            .filter(([key, value]) => !value && ['event_description', 'event_type', 'userId'].includes(key))
+            .map(([key]) => key)
+            .join(', ')
+          }`);
+      }
+
+      await EventLogger.logEvent(eventData);
+      console.log('✅ Event logged successfully');
+
+    } catch (logErr) {
+      console.error('❌ Error logging event:', logErr.message);
+      console.error('📋 Event data was:', {
+        event_date: dateYMD,
+        event_description: `Holiday Created: ${savedHoliday.name}`,
+        event_type: 'Holiday',
+        userId: req.user?._id?.toString() || req.user?.id?.toString(),
+      });
+    }
+
     res.status(201).json(savedHoliday);
   } catch (err) {
+    console.error('❌ Error creating holiday:', err);
     res.status(400).json({ error: err.message });
   }
 };
+
 
 // Get all holidays
 exports.getAllHolidays = async (req, res) => {

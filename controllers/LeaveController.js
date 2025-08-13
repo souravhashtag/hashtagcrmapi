@@ -674,9 +674,7 @@ class LeaveController {
             event_date: formattedDate,
             event_description: `Leave ${status.charAt(0).toUpperCase() + status.slice(1)}`,
             event_type: "Leave",
-            userId: updatedLeave.employeeId.userId._id, // Get userId from employee schema
-            leaveId: updatedLeave._id, // Optional: reference to the leave record
-            employeeId: updatedLeave.employeeId._id // Optional: reference to the employee
+            userId: updatedLeave.employeeId.userId._id, 
           });
         });
 
