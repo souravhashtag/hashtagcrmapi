@@ -28,7 +28,8 @@ router.get('/balance', LeaveController.getLeaveBalance);
 // Leave type management routes
 router.post('/type', LeaveController.createLeaveType);
 router.get('/type', LeaveController.getAllLeaveTypes);
-
+router.put('/type/:id', LeaveController.updateLeaveType);
+router.delete('/type/:id', LeaveController.deleteLeaveType);
 
 
 // // Get single leave by ID
