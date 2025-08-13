@@ -169,8 +169,6 @@ companySchema.methods.getLeaveAllocation = function(leaveType) {
       return this.settings.leaves.casualLeaves;
     case 'medical':
       return this.settings.leaves.medicalLeaves;
-    case 'annual':
-      return this.settings.leaves.annualLeaves;
     case 'paid':
       return this.settings.leaves.paidLeaves;
     default:

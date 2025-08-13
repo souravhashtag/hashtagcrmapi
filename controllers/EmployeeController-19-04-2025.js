@@ -83,7 +83,6 @@ class EmployeeController {
       });
     }
   }
-
   static async getAllEmployees(req, res) {
     try {
       const { page = 1, limit = 10, search, status, department, role } = req.query;
@@ -234,7 +233,6 @@ class EmployeeController {
       });
     }
   }
-
   static async getEmployeeById(req, res) {
     try {
       const { id } = req.params;
@@ -286,7 +284,6 @@ class EmployeeController {
       });
     }
   }
-
   static async updateEmployee(req, res) {
     try {
       const { id } = req.params;
@@ -401,7 +398,6 @@ class EmployeeController {
       });
     }
   }
-
   static async deleteEmployee(req, res) {
     try {
       const { id } = req.params;
