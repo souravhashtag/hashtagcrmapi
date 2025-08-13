@@ -8,7 +8,6 @@ const eventSchema = new mongoose.Schema(
     },
     event_description: {
       type: String,
-      required: true,
       trim: true
     },
     event_type: {
@@ -18,7 +17,8 @@ const eventSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
-    }
+    },
+    refId: { type: mongoose.Schema.Types.ObjectId, ref: 'Holiday', index: true }
   },
   {
     timestamps: true
