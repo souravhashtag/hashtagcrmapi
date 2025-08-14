@@ -23,7 +23,7 @@ exports.createHoliday = async (req, res) => {
         event_date: dateYMD,
         event_type: 'Holiday',
         refId: savedHoliday._id,
-        event_description: savedHoliday.description
+        event_description: savedHoliday.name
       };
 
       // Debug logging to see what we're sending
