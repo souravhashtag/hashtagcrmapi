@@ -656,25 +656,34 @@ class LeaveController {
         const startDate = new Date(updatedLeave.startDate);
         const endDate = new Date(updatedLeave.endDate);
 
-        // Generate array of dates between start and end date (inclusive)
-        const dates = [];
-        const currentDate = new Date(startDate);
+        // Normalize bounds to local midnight to avoid partial-day drift
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(0, 0, 0, 0);
 
-        while (currentDate <= endDate) {
-          dates.push(new Date(currentDate));
-          currentDate.setDate(currentDate.getDate() + 1);
+        // Build date-only (UTC) objects for each day
+        const dates = [];
+        const cursor = new Date(start);
+        while (cursor <= end) {
+          // Create a UTC midnight date-only for the current day
+          const eventDateUtc = new Date(Date.UTC(
+            cursor.getFullYear(),
+            cursor.getMonth(),
+            cursor.getDate()
+          ));
+          dates.push(eventDateUtc);
+          cursor.setDate(cursor.getDate() + 1);
         }
 
-        // Log event for each date
-        // Log event for each date
-        const logPromises = dates.map(date => {
-          const formattedDate = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-
+        // Log event for each date (pass Date object, not a string)
+        const logPromises = dates.map(dateOnlyUtc => {
           return EventLogger.logEvent({
-            event_date: formattedDate,
+            event_date: dateOnlyUtc, // <-- actual Date, UTC midnight
             event_description: `Leave ${status.charAt(0).toUpperCase() + status.slice(1)}`,
             event_type: "Leave",
-            userId: updatedLeave.employeeId.userId._id, 
+            userId: updatedLeave.employeeId?.userId?._id, // optional
+            refId: updatedLeave._id                       // optional, nice to link
           });
         });
 

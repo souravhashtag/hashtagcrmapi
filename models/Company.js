@@ -53,50 +53,22 @@ const companySchema = new Schema({
     // Enhanced recipient system
     recipients: {
       to: [{
-        type: {
-          type: String,
-          enum: ['user', 'group', 'external'],
-          required: true
-        },
         id: Schema.Types.ObjectId, // User ID or Group ID
         email: {
           type: String,
           lowercase: true,
           trim: true
         }, // For external emails
-        name: String, // Display name
-        status: {
-          type: String,
-          enum: ['pending', 'sent', 'delivered', 'read', 'failed'],
-          default: 'pending'
-        },
-        sentAt: Date,
-        deliveredAt: Date,
-        readAt: Date,
-        failureReason: String
+        name: String, 
       }],
       cc: [{
-        type: {
-          type: String,
-          enum: ['user', 'group', 'external'],
-          required: true
-        },
         id: Schema.Types.ObjectId,
         email: {
           type: String,
           lowercase: true,
           trim: true
         },
-        name: String,
-        status: {
-          type: String,
-          enum: ['pending', 'sent', 'delivered', 'read', 'failed'],
-          default: 'pending'
-        },
-        sentAt: Date,
-        deliveredAt: Date,
-        readAt: Date,
-        failureReason: String
+        name: String
       }],
       bcc: [{
         type: {
