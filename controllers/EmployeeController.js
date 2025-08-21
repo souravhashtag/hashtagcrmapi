@@ -777,7 +777,11 @@ class EmployeeController {
         .select('_id employeeId joiningDate dob')
         .populate({
           path: 'userId',
-          select: 'firstName lastName email phone profilePicture'
+          select: 'firstName lastName email phone profilePicture',
+          populate: {
+            path: 'department',
+            select: 'name'
+          }
         }).lean();
 
       employee.user = employee.userId;

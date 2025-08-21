@@ -5,25 +5,6 @@ const emailService = require("../services/emailService");
 const LeaveType = require("../models/LeaveType");
 const EventLogger = require("./EventController");
 
-
-
-
-function getFinancialYearRange(date = new Date()) {
-  // FY starts on April 1
-  const year = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
-  const start = new Date(year, 3, 1, 0, 0, 0, 0);           // Apr 1, 00:00:00
-  const end = new Date(year + 1, 2, 31, 23, 59, 59, 999);   // Mar 31, 23:59:59
-  return { start, end, label: `${year}-${(year + 1).toString().slice(-2)}` };
-}
-
-function getPrevFinancialYearRange(date = new Date()) {
-  const { start } = getFinancialYearRange(date);
-  const prevEnd = new Date(start.getTime() - 1); // one millisecond before current FY start
-  return getFinancialYearRange(prevEnd);
-}
-
-
-
 class LeaveController {
 
   // Create leave request
@@ -656,25 +637,34 @@ class LeaveController {
         const startDate = new Date(updatedLeave.startDate);
         const endDate = new Date(updatedLeave.endDate);
 
-        // Generate array of dates between start and end date (inclusive)
-        const dates = [];
-        const currentDate = new Date(startDate);
+        // Normalize bounds to local midnight to avoid partial-day drift
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(0, 0, 0, 0);
 
-        while (currentDate <= endDate) {
-          dates.push(new Date(currentDate));
-          currentDate.setDate(currentDate.getDate() + 1);
+        // Build date-only (UTC) objects for each day
+        const dates = [];
+        const cursor = new Date(start);
+        while (cursor <= end) {
+          // Create a UTC midnight date-only for the current day
+          const eventDateUtc = new Date(Date.UTC(
+            cursor.getFullYear(),
+            cursor.getMonth(),
+            cursor.getDate()
+          ));
+          dates.push(eventDateUtc);
+          cursor.setDate(cursor.getDate() + 1);
         }
 
-        // Log event for each date
-        // Log event for each date
-        const logPromises = dates.map(date => {
-          const formattedDate = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-
+        // Log event for each date (pass Date object, not a string)
+        const logPromises = dates.map(dateOnlyUtc => {
           return EventLogger.logEvent({
-            event_date: formattedDate,
+            event_date: dateOnlyUtc, // <-- actual Date, UTC midnight
             event_description: `Leave ${status.charAt(0).toUpperCase() + status.slice(1)}`,
             event_type: "Leave",
-            userId: updatedLeave.employeeId.userId._id, 
+            userId: updatedLeave.employeeId?.userId?._id, // optional
+            refId: updatedLeave._id                       // optional, nice to link
           });
         });
 
