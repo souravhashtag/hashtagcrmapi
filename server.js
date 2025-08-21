@@ -42,6 +42,7 @@ app.use("/api/V1/events", eventRoutes);
 app.use("/api/V1/company", CompanyRoutes);
 app.use("/api/V1/countries", CountryRoutes);
 app.use("/api/V1/notices", noticeRoutes);
+app.use("/api/V1/payrolls", payrollRoutes);
 
 const PORT = process.env.PORT || 5000;
 mongoose

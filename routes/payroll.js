@@ -1,20 +1,15 @@
 const express = require('express');
+const ctrl = require('../controllers/PayrollController');
 const router = express.Router();
-const payrollController = require('../controllers/PayrollController');
 
-// Create payroll
-router.post('/', payrollController.createPayroll);
+router.post('/', ctrl.createPayroll);
+router.get('/', ctrl.listPayrolls);
+router.get('/:id', ctrl.getPayroll);
+router.patch('/:id', ctrl.updatePayroll);
+router.delete('/:id', ctrl.deletePayroll);
 
-// Get all payrolls
-router.get('/', payrollController.getAllPayrolls);
-
-// Get payroll by ID
-router.get('/:id', payrollController.getPayrollById);
-
-// Update payroll
-router.put('/:id', payrollController.updatePayroll);
-
-// Delete payroll
-router.delete('/:id', payrollController.deletePayroll);
+// extras
+router.patch('/:id/status', ctrl.setPaymentStatus);
+router.post('/:id/recalculate', ctrl.recalculateTotals);
 
 module.exports = router;
