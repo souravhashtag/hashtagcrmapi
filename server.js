@@ -21,7 +21,7 @@ const performaceRoutes = require("./routes/performance");
 const menuRoutes = require("./routes/menu");
 const assignmentRoutes = require("./routes/assignment");
 const noticeRoutes = require("./routes/notice");
-// const eventRoutes = require("./routes/event");
+const rosterRoutes = require("./routes/roster");
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -38,6 +38,7 @@ app.use("/api/V1/leave", leaveRoutes);
 app.use("/api/V1/assignments", assignmentRoutes);
 app.use("/api/V1/events", eventRoutes);
 app.use("/api/V1/notices", noticeRoutes);
+app.use("/api/V1/roster", rosterRoutes);
 
 const PORT = process.env.PORT || 5000;
 mongoose
