@@ -5,25 +5,6 @@ const emailService = require("../services/emailService");
 const LeaveType = require("../models/LeaveType");
 const EventLogger = require("./EventController");
 
-
-
-
-function getFinancialYearRange(date = new Date()) {
-  // FY starts on April 1
-  const year = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
-  const start = new Date(year, 3, 1, 0, 0, 0, 0);           // Apr 1, 00:00:00
-  const end = new Date(year + 1, 2, 31, 23, 59, 59, 999);   // Mar 31, 23:59:59
-  return { start, end, label: `${year}-${(year + 1).toString().slice(-2)}` };
-}
-
-function getPrevFinancialYearRange(date = new Date()) {
-  const { start } = getFinancialYearRange(date);
-  const prevEnd = new Date(start.getTime() - 1); // one millisecond before current FY start
-  return getFinancialYearRange(prevEnd);
-}
-
-
-
 class LeaveController {
 
   // Create leave request
