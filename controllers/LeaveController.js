@@ -226,7 +226,7 @@ class LeaveController {
           }
         );
 
-        console.log('✅ Leave application email notification sent successfully');
+        // console.log('✅ Leave application email notification sent successfully');
       } catch (emailError) {
         console.error('❌ Email notification failed:', emailError);
         // Don't fail the request if email fails

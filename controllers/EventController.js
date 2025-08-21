@@ -32,7 +32,7 @@ class EventLogger {
         data: savedEvent
       };
     } catch (error) {
-      console.error('❌ Error logging event:', error);
+      console.error('Error logging event:', error);
       return {
         success: false,
         error: error.message
@@ -45,7 +45,10 @@ class EventLogger {
       const endDate = new Date(year, month, 0);
 
       const events = await Event.find({
-        userId: userId,
+        $or: [
+          { userId: userId },
+          { userId: null }
+        ],
         event_date: {
           $gte: startDate,
           $lt: new Date(year, month, 1)
@@ -65,7 +68,7 @@ class EventLogger {
         if (eventsMap[day].label === '') {
           eventsMap[day].label = event.event_description;
           eventsMap[day].type = event.event_type;
-          // eventsMap[day].color = (event?.event_type=='Leave' ? 'red' : (event?.event_type=='Holiday' ? 'green' : 'blue'));
+          eventsMap[day].emoji = (event?.event_type=='Holiday' ? '😊' : "");
         } else {
           eventsMap[day].label += ', ' + event.event_description;
         }
