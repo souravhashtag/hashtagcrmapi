@@ -1,8 +1,23 @@
 const mongoose = require('mongoose');
 const Payroll = require('../models/Payroll');
+const Employee = require('../models/Employee');
 
-// -------- helpers --------
-const sum = (arr = []) => arr.reduce((a, b) => a + (Number(b) || 0), 0);
+async function resolveEmployeeId(req) {
+  // If middleware already added employeeId
+  // if (req.user?.employeeId && mongoose.isValidObjectId(req.user.employeeId)) {
+  //   return req.user.employeeId;
+  // }
+
+  // If user object is available, search Employee by userId
+  if (req.user?.id && mongoose.isValidObjectId(req.user.id)) {
+    const emp = await Employee.findOne({ userId: req.user.id }).select('_id');
+    if (emp) {
+      return emp._id.toString();
+    }
+  }
+
+  return null; // not found
+}
 
 function calcTotals(doc) {
   const s = doc.salaryStructure || {};
@@ -247,6 +262,106 @@ exports.recalculateTotals = async (req, res) => {
 
     const saved = await doc.save();
     return res.json(saved);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+
+/**
+ * GET /api/payrolls/my
+ * Return only the authenticated employee's payrolls
+ * Supports same query params as listPayrolls: month, year, status, q, page, limit, sort
+ */
+exports.listMyPayrolls = async (req, res) => {
+  try {
+    const empId = await resolveEmployeeId(req);
+    if (!empId) {
+      return res.status(403).json({ error: 'Employee profile not found for current user' });
+    }
+
+
+    console.log('Employee ID:', empId);
+
+    const {
+      month,
+      year,
+      status, // paymentStatus
+      q,      // search by transactionId (employeeId is fixed to current user)
+      page = 1,
+      limit = 20,
+      sort = 'year:desc,month:desc,createdAt:desc',
+    } = req.query;
+
+    const filter = { employeeId: empId };
+    if (month) filter.month = Number(month);
+    if (year) filter.year = Number(year);
+    if (status) filter.paymentStatus = status;
+    if (q) {
+      filter.$or = [
+        { transactionId: new RegExp(q, 'i') },
+      ];
+    }
+
+    const sortObj = {};
+    (sort || '').split(',').forEach((pair) => {
+      const [k, dir = 'asc'] = pair.split(':');
+      if (k) sortObj[k] = dir.toLowerCase() === 'desc' ? -1 : 1;
+    });
+
+    const p = Math.max(parseInt(page, 10) || 1, 1);
+    const l = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 200);
+    const skip = (p - 1) * l;
+
+    const [items, total] = await Promise.all([
+      Payroll.find(filter)
+        .sort(sortObj)
+        .skip(skip)
+        .limit(l)
+        .populate({
+          path: 'employeeId',
+          select: 'employeeId userId department',
+          populate: { path: 'userId', select: 'firstName lastName' },
+        }),
+      Payroll.countDocuments(filter),
+    ]);
+
+    return res.json({
+      items,
+      page: p,
+      limit: l,
+      total,
+      pages: Math.ceil(total / l),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * GET /api/payrolls/my/:id
+ * Fetch a single payroll by id, but only if it belongs to the current employee
+ */
+exports.getMyPayroll = async (req, res) => {
+  try {
+    const empId = await resolveEmployeeId(req);
+    if (!empId) {
+      return res.status(403).json({ error: 'Employee profile not found for current user' });
+    }
+
+    const doc = await Payroll.findOne({ _id: req.params.id, employeeId: empId })
+      .populate({
+        path: 'employeeId',
+        select: 'employeeId userId',
+        populate: {
+          path: 'userId',
+          select: 'firstName lastName department',
+          populate: { path: 'department', select: 'name' },
+        },
+      });
+
+    if (!doc) return res.status(404).json({ error: 'Payroll not found' });
+    return res.json(doc);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }

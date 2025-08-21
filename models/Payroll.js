@@ -35,7 +35,7 @@ const payrollSchema = new Schema({
   paymentDate: Date,
   paymentMethod: {
     type: String,
-    enum: ['bank-transfer', 'check', 'cash', 'online']
+    enum: ['bank_transfer', 'check', 'cash', 'online']
   },
   transactionId: String,
   payslipUrl: String,

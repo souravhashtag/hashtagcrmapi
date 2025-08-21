@@ -1,9 +1,14 @@
 const express = require('express');
 const ctrl = require('../controllers/PayrollController');
+const UserController = require('../controllers/UserController');
 const router = express.Router();
 
 router.post('/', ctrl.createPayroll);
 router.get('/', ctrl.listPayrolls);
+
+router.get('/my', UserController.verifyToken, ctrl.listMyPayrolls);
+router.get('/my/:id', UserController.verifyToken, ctrl.getMyPayroll);
+
 router.get('/:id', ctrl.getPayroll);
 router.patch('/:id', ctrl.updatePayroll);
 router.delete('/:id', ctrl.deletePayroll);
