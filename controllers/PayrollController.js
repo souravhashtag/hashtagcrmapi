@@ -111,49 +111,80 @@ exports.listPayrolls = async (req, res) => {
       month,
       year,
       status, // paymentStatus
-      q,      // search by employeeId or transactionId
+      q,      // search by employeeId, transactionId, or employee name
       page = 1,
       limit = 20,
       sort = 'year:desc,month:desc,createdAt:desc',
     } = req.query;
 
-    const filter = {};
-    if (employeeId && mongoose.isValidObjectId(employeeId)) {
-      filter.employeeId = employeeId;
-    }
-    if (month) filter.month = Number(month);
-    if (year) filter.year = Number(year);
-    if (status) filter.paymentStatus = status;
-    if (q) {
-      filter.$or = [
-        { transactionId: new RegExp(q, 'i') },
-        ...(mongoose.isValidObjectId(q) ? [{ employeeId: q }] : []),
-      ];
-    }
+    const p = Math.max(parseInt(page, 10) || 1, 1);
+    const l = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 200);
+    const skip = (p - 1) * l;
 
+    const match = {};
+    if (employeeId && mongoose.isValidObjectId(employeeId)) {
+      match.employeeId = new mongoose.Types.ObjectId(employeeId);
+    }
+    if (month) match.month = Number(month);
+    if (year) match.year = Number(year);
+    if (status) match.paymentStatus = status;
+
+    // Build sort object
     const sortObj = {};
     (sort || '').split(',').forEach((pair) => {
       const [k, dir = 'asc'] = pair.split(':');
       if (k) sortObj[k] = dir.toLowerCase() === 'desc' ? -1 : 1;
     });
 
-    const p = Math.max(parseInt(page, 10) || 1, 1);
-    const l = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 200);
-    const skip = (p - 1) * l;
+    // Aggregation with lookup to users
+    const pipeline = [
+      { $match: match },
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'employeeId',
+          foreignField: '_id',
+          as: 'employeeId',
+          pipeline: [
+            {
+              $lookup: {
+                from: 'users',
+                localField: 'userId',
+                foreignField: '_id',
+                as: 'userId',
+              },
+            },
+            { $unwind: { path: '$userId', preserveNullAndEmptyArrays: true } },
+          ],
+        },
+      },
+      { $unwind: { path: '$employeeId', preserveNullAndEmptyArrays: true } },
+    ];
 
+    // Search filter (transactionId, employeeId, or employee name)
+    if (q) {
+      const regex = new RegExp(q, 'i');
+      pipeline.push({
+        $match: {
+          $or: [
+            { transactionId: regex },
+            { 'employeeId.employeeId': regex },
+            { 'employeeId.userId.firstName': regex },
+            { 'employeeId.userId.lastName': regex },
+            ...(mongoose.isValidObjectId(q) ? [{ employeeId: new mongoose.Types.ObjectId(q) }] : []),
+          ],
+        },
+      });
+    }
+
+    pipeline.push({ $sort: sortObj });
+    pipeline.push({ $skip: skip });
+    pipeline.push({ $limit: l });
+
+    // Count total separately
     const [items, total] = await Promise.all([
-      Payroll.find(filter)
-        .sort(sortObj)
-        .skip(skip)
-        .limit(l)
-        .populate({
-          path: 'employeeId', select: 'employeeId userId department',
-          populate: {
-            path: 'userId',
-            select: 'firstName lastName'
-          }
-        }),
-      Payroll.countDocuments(filter),
+      Payroll.aggregate(pipeline),
+      Payroll.countDocuments(match),
     ]);
 
     return res.json({
@@ -167,6 +198,7 @@ exports.listPayrolls = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
 
 // Get by ID
 exports.getPayroll = async (req, res) => {
