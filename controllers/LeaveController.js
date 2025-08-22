@@ -898,22 +898,23 @@ class LeaveController {
             $match: {
               employeeId: employee._id,
               type,
-              status: 'approved',
+              // count pending immediately; exclude rejected/cancelled
+              status: { $in: ['approved', 'pending'] },
               startDate: { $lte: yearEnd },
-              endDate: { $gte: yearStart }
-            }
+              endDate: { $gte: yearStart },
+            },
           },
           {
             $group: {
               _id: null,
-              total: { $sum: '$totalDays' }
-            }
-          }
+              total: { $sum: '$totalDays' },
+            },
+          },
         ]);
 
-        // Return the exact sum without rounding to preserve decimal values (0.5, 1.5, etc.) 
-        return result[0]?.total || 0;
+        return result[0]?.total || 0; // preserves 0.5, 1.5, etc.
       };
+
 
       // Calculate leave balances for each leave type
       const leaveBalances = {};
