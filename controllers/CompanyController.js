@@ -143,8 +143,8 @@ class CompanyController {
       const updatedCompany = await companyDetails.findOneAndUpdate(
         {}, // Empty filter to find the single company
         { $set: updateData },
-        { 
-          new: true, 
+        {
+          new: true,
           runValidators: true,
           upsert: false // Don't create if not exists, should use initialize instead
         }
@@ -187,8 +187,8 @@ class CompanyController {
 
       const updatedCompany = await companyDetails.findOneAndUpdate(
         {},
-        { 
-          $set: { 
+        {
+          $set: {
             'settings.ceoTalk.Message': message.trim(),
             updatedAt: new Date()
           }
@@ -222,83 +222,83 @@ class CompanyController {
   }
 
   // Add recipient to email settings
-async addRecipient(req, res) {
-  try {
-    const { type, recipientData } = req.body; // type: 'to', 'cc', 'bcc'
+  async addRecipient(req, res) {
+    try {
+      const { type, recipientData } = req.body; // type: 'to', 'cc', 'bcc'
 
-    if (!['to', 'cc', 'bcc'].includes(type)) {
-      return res.status(400).json({
+      if (!['to', 'cc', 'bcc'].includes(type)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid recipient type. Must be "to", "cc", or "bcc"'
+        });
+      }
+
+      // Make sure email is provided
+      if (!recipientData?.email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email is required'
+        });
+      }
+
+      // Normalize email
+      const email = recipientData.email.toLowerCase().trim();
+
+      // Optional: Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid email format'
+        });
+      }
+
+      const name = (recipientData.name || '').trim();
+
+      const company = await companyDetails.findOne();
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company not found'
+        });
+      }
+
+      // Initialize recipients if missing
+      if (!company.settings.recipients) {
+        company.settings.recipients = { to: [], cc: [], bcc: [] };
+      }
+
+      // Check for duplicate by email only
+      const exists = company.settings.recipients[type].some(
+        r => r.email.toLowerCase() === email
+      );
+
+      if (exists) {
+        return res.status(400).json({
+          success: false,
+          message: `Recipient already exists in ${type} list`
+        });
+      }
+
+      // Push only name and email
+      company.settings.recipients[type].push({ name, email });
+      await company.save();
+
+      res.status(200).json({
+        success: true,
+        message: `Recipient added to ${type} list successfully`,
+        data: company.settings.recipients
+      });
+
+    } catch (error) {
+      console.error('Error adding recipient:', error);
+      res.status(500).json({
         success: false,
-        message: 'Invalid recipient type. Must be "to", "cc", or "bcc"'
+        message: 'Error adding recipient',
+        error: error.message
       });
     }
-
-    // Make sure email is provided
-    if (!recipientData?.email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email is required'
-      });
-    }
-
-    // Normalize email
-    const email = recipientData.email.toLowerCase().trim();
-
-    // Optional: Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format'
-      });
-    }
-
-    const name = (recipientData.name || '').trim();
-
-    const company = await companyDetails.findOne();
-    if (!company) {
-      return res.status(404).json({
-        success: false,
-        message: 'Company not found'
-      });
-    }
-
-    // Initialize recipients if missing
-    if (!company.settings.recipients) {
-      company.settings.recipients = { to: [], cc: [], bcc: [] };
-    }
-
-    // Check for duplicate by email only
-    const exists = company.settings.recipients[type].some(
-      r => r.email.toLowerCase() === email
-    );
-
-    if (exists) {
-      return res.status(400).json({
-        success: false,
-        message: `Recipient already exists in ${type} list`
-      });
-    }
-
-    // Push only name and email
-    company.settings.recipients[type].push({ name, email });
-    await company.save();
-
-    res.status(200).json({
-      success: true,
-      message: `Recipient added to ${type} list successfully`,
-      data: company.settings.recipients
-    });
-
-  } catch (error) {
-    console.error('Error adding recipient:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error adding recipient',
-      error: error.message
-    });
   }
-}
 
 
   // Remove recipient from email settings
@@ -497,7 +497,7 @@ async addRecipient(req, res) {
       }
 
       const updatePath = `settings.leaves.${leaveType}Leaves`;
-      
+
       const updatedCompany = await companyDetails.findOneAndUpdate(
         {},
         {
@@ -584,8 +584,8 @@ async addRecipient(req, res) {
           hasEmail: !!company.contactInfo?.email,
           hasWebsite: !!company.contactInfo?.website,
           hasCompleteAddress: !!(
-            company.address?.street && 
-            company.address?.city && 
+            company.address?.street &&
+            company.address?.city &&
             company.address?.country
           )
         },
@@ -734,7 +734,7 @@ async addRecipient(req, res) {
   async checkCompanyExists(req, res) {
     try {
       const company = await companyDetails.findOne().select('name domain');
-      
+
       res.status(200).json({
         success: true,
         exists: !!company,
@@ -750,6 +750,193 @@ async addRecipient(req, res) {
       });
     }
   }
+
+
+  // CREATE one component: POST /company/payroll/components
+  async createPayrollComponent(req, res) {
+    try {
+      // Accept only the allowed fields
+      const raw = req.body || {};
+      const component = {
+        name: String(raw.name || '').trim(),
+        code: String(raw.code || '').trim().toLowerCase(),
+        percent: raw.percent != null ? Number(raw.percent) : undefined,
+        isActive: raw.isActive === false ? false : true
+      };
+
+      // Basic validation (keep schema as-is)
+      if (!component.name || !component.code) {
+        return res.status(400).json({ success: false, message: 'name and code are required' });
+      }
+      // Restrict to your enum in schema
+      if (!['basic', 'hra', 'allowances'].includes(component.code)) {
+        return res.status(400).json({ success: false, message: 'code must be one of: basic, hra, allowances' });
+      }
+      if (component.percent == null || Number.isNaN(component.percent)) {
+        return res.status(400).json({ success: false, message: 'percent is required and must be a number' });
+      }
+      if (component.percent < 0 || component.percent > 100) {
+        return res.status(400).json({ success: false, message: 'percent must be between 0 and 100' });
+      }
+
+      const company = await companyDetails.findOne();
+      if (!company) {
+        return res.status(404).json({ success: false, message: 'Company not found' });
+      }
+
+      const list = company?.settings?.payroll?.components || [];
+      if (list.some(c => (c.code || '').toLowerCase() === component.code)) {
+        return res.status(400).json({ success: false, message: `Component with code "${component.code}" already exists` });
+      }
+
+      list.push(component);
+      company.set('settings.payroll.components', list);
+      company.set('updatedAt', new Date());
+      await company.save();
+
+      res.status(201).json({ success: true, data: component, components: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: 'Failed to create component', error: err.message });
+    }
+  }
+
+  // FIXED BULK UPDATE: PUT /company/payroll/components
+  // Replaces the entire components array (your original intent), but with strict validation & normalization.
+  async updatePayrollComponents(req, res) {
+    try {
+      const { components } = req.body;
+      if (!Array.isArray(components)) {
+        return res.status(400).json({ success: false, message: 'components must be an array' });
+      }
+
+      // Normalize + validate
+      const seen = new Set();
+      const cleaned = components.map((raw, idx) => {
+        const item = {
+          name: String(raw.name || '').trim(),
+          code: String(raw.code || '').trim().toLowerCase(),
+          percent: raw.percent != null ? Number(raw.percent) : undefined,
+          isActive: raw.isActive === false ? false : true
+        };
+
+        if (!item.name || !item.code) {
+          throw new Error(`Row ${idx + 1}: name and code are required`);
+        }
+        if (!['basic', 'hra', 'allowances'].includes(item.code)) {
+          throw new Error(`Row ${idx + 1}: code must be one of: basic, hra, allowances`);
+        }
+        if (seen.has(item.code)) {
+          throw new Error(`Duplicate code: ${item.code}`);
+        }
+        seen.add(item.code);
+
+        if (item.percent == null || Number.isNaN(item.percent)) {
+          throw new Error(`Row ${idx + 1}: percent is required and must be a number`);
+        }
+        if (item.percent < 0 || item.percent > 100) {
+          throw new Error(`Row ${idx + 1}: percent must be between 0 and 100`);
+        }
+        return item;
+      });
+
+      const updated = await companyDetails.findOneAndUpdate(
+        {},
+        { $set: { 'settings.payroll.components': cleaned, updatedAt: new Date() } },
+        { new: true, runValidators: true }
+      );
+
+      if (!updated) {
+        return res.status(404).json({ success: false, message: 'Company not found' });
+      }
+
+      res.json({ success: true, data: updated.settings.payroll.components });
+    } catch (err) {
+      res.status(400).json({ success: false, message: 'Failed to update components', error: err.message });
+    }
+  }
+
+  // PATCH one by code: PATCH /company/payroll/components/:code
+  // Partial update (name/percent/isActive). Does NOT allow changing code.
+  async patchPayrollComponent(req, res) {
+    try {
+      const code = String(req.params.code || '').toLowerCase();
+      if (!['basic', 'hra', 'allowances'].includes(code)) {
+        return res.status(400).json({ success: false, message: 'code must be one of: basic, hra, allowances' });
+      }
+
+      const updates = {};
+      if (req.body.name != null) updates.name = String(req.body.name).trim();
+      if (req.body.percent != null) {
+        const p = Number(req.body.percent);
+        if (Number.isNaN(p) || p < 0 || p > 100) {
+          return res.status(400).json({ success: false, message: 'percent must be a number between 0 and 100' });
+        }
+        updates.percent = p;
+      }
+      if (req.body.isActive != null) updates.isActive = !!req.body.isActive;
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ success: false, message: 'No valid fields to update' });
+      }
+
+      // Build $set with arrayFilters to update the matching item by code
+      const $set = {};
+      for (const [k, v] of Object.entries(updates)) {
+        $set[`settings.payroll.components.$[elem].${k}`] = v;
+      }
+
+      const doc = await companyDetails.findOneAndUpdate(
+        {},
+        { $set, $currentDate: { updatedAt: true } },
+        { new: true, arrayFilters: [{ 'elem.code': code }] }
+      );
+
+      const list = doc?.settings?.payroll?.components || [];
+      const exists = list.some(c => (c.code || '').toLowerCase() === code);
+      if (!exists) {
+        return res.status(404).json({ success: false, message: `Component with code "${code}" not found` });
+      }
+
+      res.json({ success: true, data: list.find(c => c.code.toLowerCase() === code), components: list });
+    } catch (err) {
+      res.status(500).json({ success: false, message: 'Failed to patch component', error: err.message });
+    }
+  }
+
+  // DELETE one by code: DELETE /company/payroll/components/:code
+  async deletePayrollComponent(req, res) {
+    try {
+      const code = String(req.params.code || '').toLowerCase();
+      const doc = await companyDetails.findOne();
+      if (!doc) return res.status(404).json({ success: false, message: 'Company not found' });
+
+      const list = doc.settings?.payroll?.components || [];
+      const next = list.filter(c => (c.code || '').toLowerCase() !== code);
+      if (next.length === list.length) {
+        return res.status(404).json({ success: false, message: `Component with code "${code}" not found` });
+      }
+
+      doc.set('settings.payroll.components', next);
+      doc.set('updatedAt', new Date());
+      await doc.save();
+
+      res.json({ success: true, message: 'Component deleted', components: next });
+    } catch (err) {
+      res.status(500).json({ success: false, message: 'Failed to delete component', error: err.message });
+    }
+  }
+
+  // READ all: GET /company/payroll/components
+  async getPayrollComponents(req, res) {
+    try {
+      const company = await companyDetails.findOne();
+      if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+      res.json({ success: true, data: company.settings?.payroll?.components || [] });
+    } catch (err) {
+      res.status(500).json({ success: false, message: 'Failed to fetch components', error: err.message });
+    }
+  }
+
 }
 
 module.exports = new CompanyController();

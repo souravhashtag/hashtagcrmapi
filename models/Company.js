@@ -8,7 +8,7 @@ const companyDetailsSchema = new Schema({
     trim: true
   },
   domain: {
-    type: String, 
+    type: String,
     required: true,
     unique: true,
     lowercase: true
@@ -49,7 +49,28 @@ const companyDetailsSchema = new Schema({
         default: "Thank you for reaching out. Your success is our priority. We will get back to you soon."
       }
     },
-    
+
+    payroll: {
+      components: [
+        {
+          name: { type: String, trim: true },    // e.g. "Basic", "HRA", "Allowances"
+
+          // stable code to use in code/queries
+          code: {
+            type: String,
+            lowercase: true,
+            enum: ['basic', 'hra', 'allowances'],
+            unique: true
+          },
+
+          // percentage amount (0–100)
+          percent: { type: Number, min: 0, max: 100 },
+
+          isActive: { type: Boolean, default: true }
+        }
+      ]
+    },
+
     // Enhanced recipient system
     recipients: {
       to: [{
@@ -57,8 +78,8 @@ const companyDetailsSchema = new Schema({
           type: String,
           lowercase: true,
           trim: true
-        }, 
-        name: String, 
+        },
+        name: String,
       }],
       cc: [{
         email: {
@@ -77,7 +98,7 @@ const companyDetailsSchema = new Schema({
         name: String
       }]
     },
-    
+
     // Email metadata
     sender: {
       userId: {
@@ -97,7 +118,7 @@ const companyDetailsSchema = new Schema({
   updatedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-companyDetailsSchema.pre('save', function(next) {
+companyDetailsSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
@@ -108,18 +129,18 @@ companyDetailsSchema.index({ 'ceo.userId': 1 });
 companyDetailsSchema.index({ 'contactInfo.email': 1 });
 
 // Methods to manage leave allocations
-companyDetailsSchema.methods.getLeaveAllocation = function(leaveType) {
+companyDetailsSchema.methods.getLeaveAllocation = function (leaveType) {
   // First check dynamic allocations
   const dynamicType = this.settings.leaveAllocations.types.find(
     type => type.name === leaveType && type.isActive
   );
-  
+
   if (dynamicType) {
     return dynamicType.allocation;
   }
-  
+
   // Fallback to legacy settings
-  switch(leaveType) {
+  switch (leaveType) {
     case 'casual':
       return this.settings.leaves.casualLeaves;
     case 'medical':

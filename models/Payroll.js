@@ -5,7 +5,6 @@ const payrollSchema = new Schema({
   employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
   month: { type: Number, required: true, min: 1, max: 12 },
   year: { type: Number, required: true },
-  basicSalary: { type: Number, required: true },
   salaryStructure: {
     basic: { type: Number, required: true },
     hra: { type: Number, required: true },

@@ -4,38 +4,20 @@ const { Schema } = mongoose;
 const ruleSchema = new Schema({
   name: { type: String, required: true, trim: true },
   code: { type: String, required: true, trim: true, lowercase: true },
-  type: {
-    type: String,
-    enum: ['tax', 'hInsurance', 'pf', 'esi', 'pTax', 'tds', 'loan', 'advance', 'other'],
+  is_applicable: {
+    type: Boolean,
     required: true
   },
-  compute: {
-    mode: {
-      type: String,
-      enum: ['fixed', 'percent_of_basic', 'percent_of_gross'],
-      required: true,
-      default: 'percent_of_basic'
-    },
-    fixedAmount: { type: Number, default: 0 },
-    percent: { type: Number, default: 0 }
+  calculation_mode: { 
+    type: String, 
+    enum: ['fixed', 'percent'], 
+    required: true 
   },
-  active: { type: Boolean, default: true },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  amount: { type: Number,  min: 0 },
+  tax_slab: { type: Array, default: [] },
+  active: { type: Boolean, default: true },  
+}, { 
+  timestamps: true 
 });
 
-ruleSchema.pre('validate', function(next) {
-  // ensure compute object exists with defaults
-  this.compute = this.compute || {};
-  if (!this.compute.mode) this.compute.mode = 'percent_of_basic';
-  if (this.compute.fixedAmount == null) this.compute.fixedAmount = 0;
-  if (this.compute.percent == null) this.compute.percent = 0;
-  next();
-});
-
-ruleSchema.pre('save', function(next) {
-  this.updatedAt = new Date();
-  next();
-});
-
-module.exports = mongoose.model('SalaryDeductionRule', ruleSchema);
+module.exports = mongoose.model('salarydeductionrules', ruleSchema);

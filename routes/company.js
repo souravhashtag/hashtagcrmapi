@@ -28,4 +28,17 @@ router.put('/leave-allocation', UserController.verifyToken, controller.updateLea
 // Analytics
 router.get('/stats', UserController.verifyToken, controller.getCompanyStats);
 
+
+
+// Payroll components management
+// settings: payroll components
+router.get('/payroll/components', UserController.verifyToken, controller.getPayrollComponents);
+router.post('/payroll/components', UserController.verifyToken, controller.createPayrollComponent);
+router.put('/payroll/components', UserController.verifyToken, controller.updatePayrollComponents);       // replace all
+router.patch('/payroll/components/:code', UserController.verifyToken, controller.patchPayrollComponent); // update one
+router.delete('/payroll/components/:code', UserController.verifyToken, controller.deletePayrollComponent);
+
+
+
+
 module.exports = router;

@@ -47,7 +47,7 @@ app.use("/api/V1/countries", CountryRoutes);
 app.use("/api/V1/notices", noticeRoutes);
 app.use("/api/V1/payrolls", payrollRoutes);
 app.use("/api/V1/roster", rosterRoutes);
-app.use("/api/V1/salary-deduct-rule", salaryDeductionRule);
+app.use("/api/V1/salary-deductions", salaryDeductionRule);
 
 
 const PORT = process.env.PORT || 5000;
