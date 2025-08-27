@@ -6,6 +6,9 @@ const router = express.Router();
 router.post('/', ctrl.createPayroll);
 router.get('/', ctrl.listPayrolls);
 
+// Generate auto payslip
+router.post('/generate', ctrl.generateForAllEmployees);
+
 router.get('/my', UserController.verifyToken, ctrl.listMyPayrolls);
 router.get('/my/:id', UserController.verifyToken, ctrl.getMyPayroll);
 

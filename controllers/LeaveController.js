@@ -956,9 +956,8 @@ class LeaveController {
 
   // Create leave type
   static async createLeaveType(req, res) {
-
     try {
-      const { name, leaveCount, ispaidLeave, carryforward } = req.body;
+      const { name, leaveCount, monthlyDays, ispaidLeave, carryforward } = req.body;
 
       // Validation
       if (!name || name.trim() === '') {
@@ -980,24 +979,33 @@ class LeaveController {
         });
       }
 
-      // Validate leaveCount if provided
-      if (leaveCount !== undefined && (isNaN(leaveCount) || leaveCount < 0)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Leave count must be a non-negative number'
-        });
+      // Normalize monthlyDays
+      let monthly = 0;
+      if (monthlyDays !== undefined) {
+        const parsed = parseFloat(monthlyDays);
+        if (isNaN(parsed) || parsed < 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Monthly days must be a non-negative number'
+          });
+        }
+        if (parsed > 5) {
+          return res.status(400).json({
+            success: false,
+            message: 'Monthly days cannot exceed 5'
+          });
+        }
+        monthly = parsed;
       }
 
+      // Auto calculate yearly from monthly if present
+      const yearly = monthly > 0 ? monthly * 12 : (leaveCount || 0);
 
       // Create new leave type
-      // const leaveType = new LeaveType({
-      //   name: name.trim(),
-      //   leaveCount: leaveCount || 0,
-      //   ispaidLeave: ispaidLeave === true || ispaidLeave === 'true' || ispaidLeave === '1',
-      // });
       const leaveType = new LeaveType({
         name: name.trim(),
-        leaveCount: leaveCount || 0,
+        monthlyDays: monthly,
+        leaveCount: yearly,
         ispaidLeave: ispaidLeave === true || ispaidLeave === 'true' || ispaidLeave === '1',
         carryforward: carryforward === true || carryforward === 'true' || carryforward === '1'
       });
@@ -1009,7 +1017,6 @@ class LeaveController {
         message: 'Leave type created successfully',
         data: leaveType
       });
-
     } catch (error) {
       console.error('Error creating leave type:', error);
       res.status(500).json({
@@ -1019,6 +1026,7 @@ class LeaveController {
       });
     }
   }
+
 
   // Get all leave types with optional filters and pagination
   static async getAllLeaveTypes(req, res) {
