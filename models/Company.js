@@ -32,10 +32,11 @@ const companyDetailsSchema = new Schema({
   },
   // CEO Information
   ceo: {
-    userId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
+    name: String,
+    email: {
+      type: String,
+      lowercase: true,
+      trim: true
     },
     signature: String,
     bio: String,
