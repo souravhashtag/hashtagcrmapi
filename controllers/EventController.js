@@ -7,24 +7,26 @@ class EventLogger {
         event_date,
         event_description,
         event_type,
-        userId
+        userId,
+        refId
       } = eventData;
 
       // Validate required fields
-      if (!event_description || !event_type || !userId) {
-        throw new Error('Missing required fields: event_description, event_type, and userId are required');
+      if (!event_type) {
+        throw new Error('Missing required fields: event_type are required');
       }
 
       const event = new Event({
         event_date,
         event_description,
         event_type,
-        userId
+        ...(userId && { userId }),
+        ...(refId && { refId })
       });
 
       const savedEvent = await event.save();
       // console.log(`📝 Event logged: ${event_type} for user ${userId}`);
-      
+
       return {
         success: true,
         data: savedEvent
@@ -41,7 +43,7 @@ class EventLogger {
     try {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
-      
+
       const events = await Event.find({
         $or: [
           { userId: userId },
@@ -55,23 +57,23 @@ class EventLogger {
 
       const eventsMap = {};
       const daysInMonth = endDate.getDate();
-      
+
       for (let day = 1; day <= daysInMonth; day++) {
         eventsMap[day] = { type: '', label: '' };
       }
 
       events.forEach(event => {
         const day = event.event_date.getDate();
-        
+
         if (eventsMap[day].label === '') {
           eventsMap[day].label = event.event_description;
           eventsMap[day].type = event.event_type;
           eventsMap[day].emoji = (event?.event_type=='Holiday' ? '😊' : "");
         } else {
-          eventsMap[day].label += ', ' + event.event_description;        
+          eventsMap[day].label += ', ' + event.event_description;
         }
       });
-      
+
       return eventsMap;
 
     } catch (error) {
@@ -84,7 +86,7 @@ class EventLogger {
     try {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
-      
+
       const aggregatedEvents = await Event.aggregate([
         {
           $match: {
@@ -107,7 +109,7 @@ class EventLogger {
 
       const eventsMap = {};
       const daysInMonth = endDate.getDate();
-      
+
       for (let day = 1; day <= daysInMonth; day++) {
         eventsMap[day] = { type: '', label: '' };
       }
@@ -130,22 +132,22 @@ class EventLogger {
 
   static async getCalenderData(req, res) {
     // console.log("Fetching calendar data for user:", req);
-    const { id } = req.user; 
-    const { year,month } = req?.params; 
-    try {   
+    const { id } = req.user;
+    const { year, month } = req?.params;
+    try {
       const userId = id;
       // const year = year;
       // const month = month; 
       // console.log(`Fetching calendar data for user ${userId} for ${year}-${month}`);
       // Use EventLogger.methodName for static methods
-      const eventsMap = await EventLogger.generateEventsFromDatabase(userId, year, month);   
+      const eventsMap = await EventLogger.generateEventsFromDatabase(userId, year, month);
       // console.log(`📅 Calendar data for user :`, eventsMap);  
-      res.status(200).json({ 
-          status: 200, 
-          message: 'Calender Data', 
-          data: eventsMap 
+      res.status(200).json({
+        status: 200,
+        message: 'Calender Data',
+        data: eventsMap
       });
-      
+
     } catch (error) {
       console.error('Error in example:', error);
       return {

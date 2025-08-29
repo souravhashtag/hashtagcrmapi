@@ -1,3 +1,4 @@
+const Event = require('../models/Event');
 const { Holiday } = require('../models/Holiday');
 const EventLogger = require('./EventController');
 
@@ -20,18 +21,18 @@ exports.createHoliday = async (req, res) => {
       // Make sure all required fields are properly set
       const eventData = {
         event_date: dateYMD,
-        event_description: `Holiday Created: ${savedHoliday.name}`,
         event_type: 'Holiday',
-        userId: req.user?._id?.toString() || req.user?.id?.toString(),
+        refId: savedHoliday._id,
+        event_description: savedHoliday.name
       };
 
       // Debug logging to see what we're sending
       console.log('🔍 Attempting to log event with data:', eventData);
 
       // Validate required fields before calling
-      if (!eventData.event_description || !eventData.event_type || !eventData.userId) {
+      if (!eventData.event_type) {
         throw new Error(`Missing required fields: ${Object.entries(eventData)
-          .filter(([key, value]) => !value && ['event_description', 'event_type', 'userId'].includes(key))
+          .filter(([key, value]) => !value && ['event_type'].includes(key))
           .map(([key]) => key)
           .join(', ')
           }`);
@@ -45,8 +46,7 @@ exports.createHoliday = async (req, res) => {
       console.error('📋 Event data was:', {
         event_date: dateYMD,
         event_description: `Holiday Created: ${savedHoliday.name}`,
-        event_type: 'Holiday',
-        userId: req.user?._id?.toString() || req.user?.id?.toString(),
+        event_type: 'Holiday'
       });
     }
 
@@ -171,12 +171,32 @@ exports.updateHoliday = async (req, res) => {
 };
 
 // Delete holiday
+// Delete holiday
 exports.deleteHoliday = async (req, res) => {
   try {
     const deleted = await Holiday.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: 'Holiday not found' });
-    res.json({ message: 'Holiday deleted successfully' });
+    if (!deleted) {
+      return res.status(404).json({ message: 'Holiday not found' });
+    }
+
+    let deletedCount = 0;
+    try {
+      // deleted._id is already an ObjectId — don't wrap it or stringify it
+      const result = await Event.deleteMany({ refId: deleted._id });
+      deletedCount = result?.deletedCount || 0;
+      console.log(`🗑 Deleted ${deletedCount} log(s) for holiday: ${deleted.name}`);
+    } catch (logErr) {
+      console.error('❌ Error deleting related logs:', logErr);
+    }
+
+    return res.json({
+      message: 'Holiday deleted successfully',
+      logs_deleted: deletedCount
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('❌ Error deleting holiday:', err);
+    return res.status(500).json({ error: err.message });
   }
 };
+
+

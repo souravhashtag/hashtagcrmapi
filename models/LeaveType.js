@@ -7,6 +7,10 @@ const LeaveTypeSchema = new Schema({
     required: true,
     trim: true
   },
+  monthlyDays:{
+    type: Number,
+    default: 0
+  },
   leaveCount: {
     type: Number,
     default: 0

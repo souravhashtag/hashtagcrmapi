@@ -5,25 +5,6 @@ const emailService = require("../services/emailService");
 const LeaveType = require("../models/LeaveType");
 const EventLogger = require("./EventController");
 
-
-
-
-function getFinancialYearRange(date = new Date()) {
-  // FY starts on April 1
-  const year = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
-  const start = new Date(year, 3, 1, 0, 0, 0, 0);           // Apr 1, 00:00:00
-  const end = new Date(year + 1, 2, 31, 23, 59, 59, 999);   // Mar 31, 23:59:59
-  return { start, end, label: `${year}-${(year + 1).toString().slice(-2)}` };
-}
-
-function getPrevFinancialYearRange(date = new Date()) {
-  const { start } = getFinancialYearRange(date);
-  const prevEnd = new Date(start.getTime() - 1); // one millisecond before current FY start
-  return getFinancialYearRange(prevEnd);
-}
-
-
-
 class LeaveController {
 
   // Create leave request
@@ -656,25 +637,34 @@ class LeaveController {
         const startDate = new Date(updatedLeave.startDate);
         const endDate = new Date(updatedLeave.endDate);
 
-        // Generate array of dates between start and end date (inclusive)
-        const dates = [];
-        const currentDate = new Date(startDate);
+        // Normalize bounds to local midnight to avoid partial-day drift
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(0, 0, 0, 0);
 
-        while (currentDate <= endDate) {
-          dates.push(new Date(currentDate));
-          currentDate.setDate(currentDate.getDate() + 1);
+        // Build date-only (UTC) objects for each day
+        const dates = [];
+        const cursor = new Date(start);
+        while (cursor <= end) {
+          // Create a UTC midnight date-only for the current day
+          const eventDateUtc = new Date(Date.UTC(
+            cursor.getFullYear(),
+            cursor.getMonth(),
+            cursor.getDate()
+          ));
+          dates.push(eventDateUtc);
+          cursor.setDate(cursor.getDate() + 1);
         }
 
-        // Log event for each date
-        // Log event for each date
-        const logPromises = dates.map(date => {
-          const formattedDate = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-
+        // Log event for each date (pass Date object, not a string)
+        const logPromises = dates.map(dateOnlyUtc => {
           return EventLogger.logEvent({
-            event_date: formattedDate,
+            event_date: dateOnlyUtc, // <-- actual Date, UTC midnight
             event_description: `Leave ${status.charAt(0).toUpperCase() + status.slice(1)}`,
             event_type: "Leave",
-            userId: updatedLeave.employeeId.userId._id, 
+            userId: updatedLeave.employeeId?.userId?._id, // optional
+            refId: updatedLeave._id                       // optional, nice to link
           });
         });
 
@@ -908,22 +898,23 @@ class LeaveController {
             $match: {
               employeeId: employee._id,
               type,
-              status: 'approved',
+              // count pending immediately; exclude rejected/cancelled
+              status: { $in: ['approved', 'pending'] },
               startDate: { $lte: yearEnd },
-              endDate: { $gte: yearStart }
-            }
+              endDate: { $gte: yearStart },
+            },
           },
           {
             $group: {
               _id: null,
-              total: { $sum: '$totalDays' }
-            }
-          }
+              total: { $sum: '$totalDays' },
+            },
+          },
         ]);
 
-        // Return the exact sum without rounding to preserve decimal values (0.5, 1.5, etc.) 
-        return result[0]?.total || 0;
+        return result[0]?.total || 0; // preserves 0.5, 1.5, etc.
       };
+
 
       // Calculate leave balances for each leave type
       const leaveBalances = {};
@@ -965,9 +956,8 @@ class LeaveController {
 
   // Create leave type
   static async createLeaveType(req, res) {
-
     try {
-      const { name, leaveCount, ispaidLeave, carryforward } = req.body;
+      const { name, leaveCount, monthlyDays, ispaidLeave, carryforward } = req.body;
 
       // Validation
       if (!name || name.trim() === '') {
@@ -989,24 +979,33 @@ class LeaveController {
         });
       }
 
-      // Validate leaveCount if provided
-      if (leaveCount !== undefined && (isNaN(leaveCount) || leaveCount < 0)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Leave count must be a non-negative number'
-        });
+      // Normalize monthlyDays
+      let monthly = 0;
+      if (monthlyDays !== undefined) {
+        const parsed = parseFloat(monthlyDays);
+        if (isNaN(parsed) || parsed < 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Monthly days must be a non-negative number'
+          });
+        }
+        if (parsed > 5) {
+          return res.status(400).json({
+            success: false,
+            message: 'Monthly days cannot exceed 5'
+          });
+        }
+        monthly = parsed;
       }
 
+      // Auto calculate yearly from monthly if present
+      const yearly = monthly > 0 ? monthly * 12 : (leaveCount || 0);
 
       // Create new leave type
-      // const leaveType = new LeaveType({
-      //   name: name.trim(),
-      //   leaveCount: leaveCount || 0,
-      //   ispaidLeave: ispaidLeave === true || ispaidLeave === 'true' || ispaidLeave === '1',
-      // });
       const leaveType = new LeaveType({
         name: name.trim(),
-        leaveCount: leaveCount || 0,
+        monthlyDays: monthly,
+        leaveCount: yearly,
         ispaidLeave: ispaidLeave === true || ispaidLeave === 'true' || ispaidLeave === '1',
         carryforward: carryforward === true || carryforward === 'true' || carryforward === '1'
       });
@@ -1018,7 +1017,6 @@ class LeaveController {
         message: 'Leave type created successfully',
         data: leaveType
       });
-
     } catch (error) {
       console.error('Error creating leave type:', error);
       res.status(500).json({
@@ -1028,6 +1026,7 @@ class LeaveController {
       });
     }
   }
+
 
   // Get all leave types with optional filters and pagination
   static async getAllLeaveTypes(req, res) {

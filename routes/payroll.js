@@ -1,20 +1,23 @@
 const express = require('express');
+const ctrl = require('../controllers/PayrollController');
+const UserController = require('../controllers/UserController');
 const router = express.Router();
-const payrollController = require('../controllers/PayrollController');
 
-// Create payroll
-router.post('/', payrollController.createPayroll);
+router.post('/', ctrl.createPayroll);
+router.get('/', ctrl.listPayrolls);
 
-// Get all payrolls
-router.get('/', payrollController.getAllPayrolls);
+// Generate auto payslip
+router.post('/generate', ctrl.generateForAllEmployees);
 
-// Get payroll by ID
-router.get('/:id', payrollController.getPayrollById);
+router.get('/my', UserController.verifyToken, ctrl.listMyPayrolls);
+router.get('/my/:id', UserController.verifyToken, ctrl.getMyPayroll);
 
-// Update payroll
-router.put('/:id', payrollController.updatePayroll);
+router.get('/:id', ctrl.getPayroll);
+router.patch('/:id', ctrl.updatePayroll);
+router.delete('/:id', ctrl.deletePayroll);
 
-// Delete payroll
-router.delete('/:id', payrollController.deletePayroll);
+// extras
+router.patch('/:id/status', ctrl.setPaymentStatus);
+router.post('/:id/recalculate', ctrl.recalculateTotals);
 
 module.exports = router;
