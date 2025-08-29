@@ -1,8 +1,18 @@
 const Attendance = require('../models/Attendance');
+const Roster = require('../models/Roster');
+const Employee = require('../models/Employee');
 const geoip = require('geoip-lite');
 const { getUSDate,getUSDateString } = require('../utils/usDate');
 const moment = require('moment-timezone');
+
 class AttendanceController {
+    static getWeekNumber = (date) => {
+      // console.log("date===>",date)
+        const d = (date instanceof Date) ? date : new Date(date);
+        const startOfYear = new Date(d.getFullYear(), 0, 1); 
+        const pastDaysOfYear = (d - startOfYear) / 86400000;
+        return Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+    };
     static createAttendance = async (req, res) => {
       try {
         const pstNow = moment.tz('America/Los_Angeles');
@@ -16,7 +26,30 @@ class AttendanceController {
           userId: req.user.id,
           date: dateField
         });
+        const weekNumber = AttendanceController.getWeekNumber(dateField);
+        const year = pstNow.year();
+        const employee = await Employee.findOne({
+          userId: req.user.id
+        });
+        // 1. Find roster for this user & week
+        const roster = await Roster.findOne({
+          employee_id: employee._id,
+          year,
+          week_number: weekNumber
+        });
+        // console.log("roster===>",roster);return;
+        const dayName = pstNow.format('dddd').toLowerCase();
+        let attendanceStatus = "present"; // default
+        if (roster && roster[dayName]) {
+          const { start_time } = roster[dayName];
+          const startMoment = moment.tz(start_time, "DD-MM-YYYY HH:mm", "America/Los_Angeles");
+          // console.log("dayName===>",pstNow);return;
 
+          if (pstNow.isAfter(startMoment)) {
+            attendanceStatus = "late";
+          }
+        }
+        // console.log("attendanceStatus===>",attendanceStatus);return;
         if (existing) {
           existing.clockOut = '';
           await existing.save();
@@ -33,7 +66,7 @@ class AttendanceController {
           clockInUs: pstNow.format('MM/DD/YYYY hh:mm A z'), 
           clockOut: null,
           clockOutUs: null,
-          status: 'present',
+          status: attendanceStatus,
           location: geo ? JSON.stringify(geo) : null
         });
 
@@ -199,9 +232,9 @@ class AttendanceController {
     } 
     static GeoLocation = (req, res) => {
         let ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
-        console.log(ip)
+        // console.log(ip)
         const geo = geoip.lookup(ip);
-        console.log(geo)
+        // console.log(geo)
     }
     static getAttendanceByDate = async (req, res) => {
       try {
@@ -246,7 +279,7 @@ class AttendanceController {
         //   status: r.status
         // })));
         
-        const attendance = await Attendance.find({
+        let attendance = await Attendance.find({
           date: {
             $gte: startOfDay,
             $lte: endOfDay
@@ -257,8 +290,35 @@ class AttendanceController {
           select: '_id firstName lastName email',          
         })
         .sort({ createdAt: -1 });
-        console.log("attendance===>",attendance)
-        const validAttendance = attendance.filter(record => {
+        // console.log("attendance===>",attendance)
+        // attendance.map(record => {
+        //   if (record.userId) { 
+        //     const employee = Employee.findOne({ userId: record.userId._id }).select('_id');   
+        //     console.log("employee===>",employee)        
+        //         if (employee) {
+        //           record.userId.employeeId = employee._id;
+        //         }          }
+        // });    
+        const userIds = attendance.map(a => a.userId?._id).filter(Boolean);
+
+        // Fetch employees for these users
+        const employees = await Employee.find({ userId: { $in: userIds } }).select('userId _id');
+
+        // Map employees by userId
+        const employeeMap = employees.reduce((acc, emp) => {
+          acc[emp.userId.toString()] = emp._id;
+          return acc;
+        }, {});
+
+        // Attach employeeId to each attendance record
+        const attendanceWithEmpId = attendance.map(record => {
+            const obj = record.toObject();
+            obj.userId.employeeId = employeeMap[record.userId?._id?.toString()] || null;
+            return obj;
+          });
+
+      // console.log('Processed attendance records:', attendanceWithEmpId);               
+        const validAttendance = attendanceWithEmpId.filter(record => {
           if (!record.userId) {
             //console.log('Found attendance record with null userId:', record._id);
             return false;

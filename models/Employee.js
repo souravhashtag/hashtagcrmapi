@@ -28,6 +28,8 @@ const employeeSchema = new Schema({
     currency: { type: String, default: 'USD' },
     paymentFrequency: { type: String, enum: ['monthly', 'bi-weekly', 'weekly'] }
   },
+  deductionDetails: [String],
+  issetrosterauto: { type: Boolean, default: false },
   taxInformation: {
     taxId: String,
     taxBracket: String

@@ -20,6 +20,14 @@ const userSchema = new mongoose.Schema({
     type: String, 
     required: true 
   },
+  gender:{
+    required: true,
+    type:String
+  },
+  worktimezone:{
+    required: true, 
+    type:String
+  },
   phone: String,
   profilePicture: String,
   role: {
