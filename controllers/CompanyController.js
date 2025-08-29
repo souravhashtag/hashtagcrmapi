@@ -10,7 +10,8 @@ class CompanyController {
         .populate('settings.recipients.to.name', 'firstName lastName email')
         .populate('settings.recipients.cc.name', 'firstName lastName email')
         .populate('settings.recipients.bcc.name', 'firstName lastName email')
-        .populate('settings.sender.userId', 'firstName lastName email');
+        .populate('settings.sender.userId', 'firstName lastName email')
+        .populate('settings.gracePeriod');
 
       if (!company) {
         return res.status(404).json({
@@ -21,8 +22,12 @@ class CompanyController {
 
       res.status(200).json({
         success: true,
-        data: company
+        data: {
+          ...company.toObject(),
+          gracePeriod: company.gracePeriod, // 👈 ensure frontend always gets it
+        }
       });
+
 
     } catch (error) {
       console.error('Error fetching company details:', error);
@@ -91,7 +96,8 @@ class CompanyController {
             Message: settings?.ceoTalk?.Message || "Thank you for reaching out. Your success is our priority. We will get back to you soon."
           },
           recipients: settings?.recipients || { to: [], cc: [], bcc: [] },
-          sender: settings?.sender || {}
+          sender: settings?.sender || {},
+          gracePeriod: settings?.gracePeriod != null ? Number(settings.gracePeriod) : 15, // default 15 mins
         }
       });
 
@@ -117,6 +123,7 @@ class CompanyController {
   async updateCompanyInfo(req, res) {
     try {
       const updateData = req.body;
+
 
       // Normalize email fields
       if (updateData.contactInfo?.email) {
@@ -299,7 +306,6 @@ class CompanyController {
       });
     }
   }
-
 
   // Remove recipient from email settings
   async removeRecipient(req, res) {
@@ -751,7 +757,6 @@ class CompanyController {
     }
   }
 
-
   // CREATE one component: POST /company/payroll/components
   async createPayrollComponent(req, res) {
     try {
@@ -769,9 +774,9 @@ class CompanyController {
         return res.status(400).json({ success: false, message: 'name and code are required' });
       }
       // Restrict to your enum in schema
-      if (!['basic', 'hra', 'allowances'].includes(component.code)) {
-        return res.status(400).json({ success: false, message: 'code must be one of: basic, hra, allowances' });
-      }
+      // if (!['basic', 'hra', 'allowances'].includes(component.code)) {
+      //   return res.status(400).json({ success: false, message: 'code must be one of: basic, hra, allowances' });
+      // }
       if (component.percent == null || Number.isNaN(component.percent)) {
         return res.status(400).json({ success: false, message: 'percent is required and must be a number' });
       }

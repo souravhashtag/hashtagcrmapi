@@ -50,6 +50,13 @@ const companyDetailsSchema = new Schema({
       }
     },
 
+
+    gracePeriod: {
+      type: Number,
+      default: 15, // in minutes
+      min: 0
+    },
+
     payroll: {
       components: [
         {
@@ -59,7 +66,7 @@ const companyDetailsSchema = new Schema({
           code: {
             type: String,
             lowercase: true,
-            enum: ['basic', 'hra', 'allowances'],
+            // enum: ['basic', 'hra', 'allowances'],
             unique: true
           },
 
