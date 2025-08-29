@@ -104,6 +104,7 @@ class EmployeeController {
           password: hashedPassword,
           firstName: userData.firstName,
           lastName: userData.lastName,
+          gender: userData.gender,
           phone: userData.phone,
           role: userData.roleId || userData.role,
           department: userData.departmentId || userData.department,
