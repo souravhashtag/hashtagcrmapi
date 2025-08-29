@@ -3,15 +3,10 @@ const mongoose = require('mongoose');
 
 class CompanyController {
   // Get company details (there's only one company)
+  // Get company details
   async getCompanyDetails(req, res) {
     try {
-      const company = await companyDetails.findOne()
-        .populate('ceo.userId', 'firstName lastName email profile')
-        .populate('settings.recipients.to.name', 'firstName lastName email')
-        .populate('settings.recipients.cc.name', 'firstName lastName email')
-        .populate('settings.recipients.bcc.name', 'firstName lastName email')
-        .populate('settings.sender.userId', 'firstName lastName email')
-        .populate('settings.gracePeriod');
+      const company = await companyDetails.findOne();
 
       if (!company) {
         return res.status(404).json({
@@ -24,10 +19,9 @@ class CompanyController {
         success: true,
         data: {
           ...company.toObject(),
-          gracePeriod: company.gracePeriod, // 👈 ensure frontend always gets it
+          gracePeriod: company.settings?.gracePeriod, // ensure frontend always gets it
         }
       });
-
 
     } catch (error) {
       console.error('Error fetching company details:', error);
@@ -42,7 +36,6 @@ class CompanyController {
   // Initialize company details (only if none exists)
   async initializeCompany(req, res) {
     try {
-      // Check if company already exists
       const existingCompany = await companyDetails.findOne();
       if (existingCompany) {
         return res.status(400).json({
@@ -52,32 +45,12 @@ class CompanyController {
         });
       }
 
-      const {
-        name,
-        domain,
-        logo,
-        address,
-        contactInfo,
-        ceo,
-        settings
-      } = req.body;
+      const { name, domain, logo, address, contactInfo, ceo, settings } = req.body;
 
-      // Validate required fields
-      if (!name || !domain || !ceo?.userId) {
+      if (!name || !domain || !ceo?.name || !ceo?.email) {
         return res.status(400).json({
           success: false,
-          message: 'Company name, domain, and CEO are required'
-        });
-      }
-
-      // Validate CEO user exists
-      const User = mongoose.model('User');
-      const ceoUser = await User.findById(ceo.userId);
-      if (!ceoUser) {
-        return res.status(400).json({
-          success: false,
-          message: 'CEO user not found',
-          error: 'CEO_NOT_FOUND'
+          message: 'Company name, domain, and CEO (name + email) are required'
         });
       }
 
@@ -90,14 +63,22 @@ class CompanyController {
           ...contactInfo,
           email: contactInfo?.email?.toLowerCase()
         },
-        ceo,
+        ceo: {
+          name: ceo.name,
+          email: ceo.email.toLowerCase(),
+          signature: ceo.signature || '',
+          bio: ceo.bio || '',
+          profileImage: ceo.profileImage || ''
+        },
         settings: {
           ceoTalk: {
-            Message: settings?.ceoTalk?.Message || "Thank you for reaching out. Your success is our priority. We will get back to you soon."
+            Message:
+              settings?.ceoTalk?.Message ||
+              "Thank you for reaching out. Your success is our priority. We will get back to you soon."
           },
           recipients: settings?.recipients || { to: [], cc: [], bcc: [] },
           sender: settings?.sender || {},
-          gracePeriod: settings?.gracePeriod != null ? Number(settings.gracePeriod) : 15, // default 15 mins
+          gracePeriod: settings?.gracePeriod != null ? Number(settings.gracePeriod) : 15
         }
       });
 
@@ -119,43 +100,44 @@ class CompanyController {
     }
   }
 
-  // Update company basic information
+  // Update company info
   async updateCompanyInfo(req, res) {
     try {
-      const updateData = req.body;
+      const updateData = { ...req.body };
 
-
-      // Normalize email fields
+      // normalize emails
       if (updateData.contactInfo?.email) {
         updateData.contactInfo.email = updateData.contactInfo.email.toLowerCase();
       }
-
       if (updateData.domain) {
         updateData.domain = updateData.domain.toLowerCase();
       }
+      if (updateData.ceo?.email) {
+        updateData.ceo.email = updateData.ceo.email.toLowerCase();
+      }
 
-      // If CEO is being updated, validate user exists
-      if (updateData.ceo?.userId) {
-        const User = mongoose.model('User');
-        const ceoUser = await User.findById(updateData.ceo.userId);
-        if (!ceoUser) {
-          return res.status(400).json({
-            success: false,
-            message: 'CEO user not found',
-            error: 'CEO_NOT_FOUND'
-          });
-        }
+      // ✅ if file uploaded, set ceo.profileImage
+      if (req.file) {
+        const baseUrl = process.env.FRONT_BASE_URL || 'http://localhost:5000';
+        updateData.ceo = {
+          ...(updateData.ceo || {}),
+          profileImage: `${baseUrl}/uploads/company/${req.file.filename}`
+        };
       }
 
       const updatedCompany = await companyDetails.findOneAndUpdate(
-        {}, // Empty filter to find the single company
+        {},
         { $set: updateData },
-        {
-          new: true,
-          runValidators: true,
-          upsert: false // Don't create if not exists, should use initialize instead
-        }
-      ).populate('ceo.userId', 'firstName lastName email profile');
+        { new: true, runValidators: true, upsert: false }
+      );
+
+      if (!updatedCompany) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company not found. Please initialize company first.'
+        });
+      }
+
 
       if (!updatedCompany) {
         return res.status(404).json({
@@ -169,7 +151,6 @@ class CompanyController {
         message: 'Company information updated successfully',
         data: updatedCompany
       });
-
     } catch (error) {
       console.error('Error updating company:', error);
       res.status(500).json({
@@ -179,6 +160,7 @@ class CompanyController {
       });
     }
   }
+
 
   // Update CEO Talk message
   async updateCeoTalkMessage(req, res) {
