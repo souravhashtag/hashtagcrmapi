@@ -7,6 +7,7 @@ const fs = require('fs').promises;
 const fss = require('fs');
 const os = require('os');
 const path = require('path');
+const Department = require("../models/Department");
 
 let refreshTokens = [];
 const ACCESS_TOKEN_SECRET = process.env.JWT_SECRET || 'your_access_token_secret';
@@ -151,8 +152,16 @@ class UserController {
         user.profilePicture = `${baseUrl}/${user.profilePicture}`;
       }
       const role = await Role.findById(user.role);
+
+
+      // resolve department
+      let department = null;
+      if (user.department) {
+        department = await Department.findById(user.department);
+      }
       const userObj = user.toObject();
       userObj.role = role;
+      userObj.department = department;
 
 
       res.status(200).json({ user: userObj });

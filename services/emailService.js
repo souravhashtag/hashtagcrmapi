@@ -144,7 +144,7 @@ class EmailService {
   }
 
   // Send leave rejection notification
-   async sendLeaveRejectionNotification(leave, employee, approver, options = {}) {
+  async sendLeaveRejectionNotification(leave, employee, approver, options = {}) {
     try {
       const {
         additionalTo = [],
@@ -459,10 +459,10 @@ class EmailService {
             <div class="important-note">
               <h4>${isApproved ? '🎉 Congratulations!' : '😔 We apologize for the inconvenience'}</h4>
               <p>
-                ${isApproved 
-                  ? `Your leave request has been approved. Please ensure all necessary handovers are completed before your leave begins. Enjoy your time off!`
-                  : `Your leave request has been rejected. Please review the rejection reason above and feel free to contact HR if you need clarification or wish to submit a revised request.`
-                }
+                ${isApproved
+        ? `Your leave request has been approved. Please ensure all necessary handovers are completed before your leave begins. Enjoy your time off!`
+        : `Your leave request has been rejected. Please review the rejection reason above and feel free to contact HR if you need clarification or wish to submit a revised request.`
+      }
               </p>
             </div>
             
@@ -482,6 +482,162 @@ class EmailService {
       </html>
     `;
   }
+
+
+
+
+
+
+
+
+  /** -------------------------------
+  * EOD Report Notification
+  * ------------------------------- */
+  // services/emailService.js
+
+  async sendEODReportNotification(report, options = {}) {
+    try {
+      const { additionalTo = [], cc = [], bcc = [] } = options;
+
+      // Populate roles properly
+      // const users = await User.find({ status: 'active' }).populate('role', 'name email');
+      // const hrUsers = users.filter(u =>
+      //   ['HR', 'Admin', 'hr', 'admin'].includes(u.role?.name)
+      // );
+
+      // const hrEmails = hrUsers.map(u => u.email).filter(Boolean);
+
+
+      // Instead of fetching users & filtering HR/Admin
+      // just hardcode your email as BCC
+
+      const toEmails = []; // leave TO empty
+      const ccEmails = []; // leave CC empty
+
+      // 👇 replace with your own email
+      const bccEmails = [process.env.MY_TEST_EMAIL || "reshab@hashtagbizsolutions.com"];
+
+      const mailOptions = {
+        from: `"${process.env.COMPANY_NAME || 'Company'} Reports" <${process.env.EMAIL_USER}>`,
+        to: toEmails.length ? toEmails.join(', ') : undefined,
+        cc: ccEmails.length ? ccEmails.join(', ') : undefined,
+        bcc: bccEmails.join(', '), // always send here
+        subject: `📊 EOD Report - ${report.employeeName} (${report.date})`,
+        html: this.getEODReportTemplate(report),
+      };
+
+
+      const defaultRecipient = process.env.MANAGER_EMAIL || process.env.EMAIL_USER;
+      // const toEmails = [...hrEmails, ...additionalTo];
+
+      if (toEmails.length === 0) {
+        toEmails.push(defaultRecipient); // fallback
+      }
+
+      // const mailOptions = {
+      //   from: `"${process.env.COMPANY_NAME || 'Company'} Reports" <${process.env.EMAIL_USER}>`,
+      //   to: toEmails.join(', '),
+      //   cc: cc.length ? cc.join(', ') : undefined,
+      //   bcc: bcc.length ? bcc.join(', ') : undefined,
+      //   subject: `📊 EOD Report - ${report.employeeName} (${report.date})`,
+      //   html: this.getEODReportTemplate(report),
+      // };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ EOD Report email sent:', result.messageId);
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error('❌ Error sending EOD Report notification:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /** -------------------------------
+   * EOD Report HTML Template
+   * ------------------------------- */
+  getEODReportTemplate(report) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8" />
+        <style>
+          body { font-family: Arial, sans-serif; color: #333; }
+          .container { max-width: 700px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 10px; }
+          .header { background: linear-gradient(135deg, #129990 0%, #117ca7 100%); padding: 20px; color: white; border-radius: 10px 10px 0 0; }
+          .section { background: white; padding: 20px; margin: 15px 0; border-radius: 8px; }
+          h2 { margin-top: 0; color: #129990; }
+          ul { padding-left: 20px; }
+          .status { font-weight: bold; }
+          .status-pending { color: #d97706; }
+          .status-ongoing { color: #2563eb; }
+          .status-completed { color: #15803d; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📊 End of Day Report</h1>
+            <p>${report.date}</p>
+          </div>
+
+          <div class="section">
+            <h2>👤 Employee Info</h2>
+            <p><b>Name:</b> ${report.employeeName}</p>
+            <p><b>Position:</b> ${report.position}</p>
+            <p><b>Department:</b> ${report.department}</p>
+          </div>
+
+          <div class="section">
+            <h2>✅ Activities</h2>
+            <ul>
+              ${report.activities.map(a => `
+                <li>
+                  <b>${a.activity || 'Untitled'}</b> 
+                  <span class="status status-${a.status.toLowerCase()}">(${a.status})</span>
+                  <br/>
+                  ${a.startTime ? `${a.startTime} - ${a.endTime}` : ''} 
+                  <br/>
+                  ${a.description || ''}
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+
+          <div class="section">
+              <h2>🛑 Breaks</h2>
+              <ul>
+                ${report.breaks && report.breaks.length > 0 ? report.breaks.map(b => `
+                  <li>
+                    <b>${b.name || 'Break'}</b> 
+                    <span class="status status-${b.status?.toLowerCase()}">(${b.status})</span>
+                    <br/>
+                    ${b.from ? `${b.from} - ${b.to}` : ''}
+                  </li>
+                `).join('') : '<li>No breaks recorded</li>'}
+              </ul>
+          </div>
+
+          <div class="section">
+            <h2>📅 Plans</h2>
+            <p>${report.plans || 'No plans added'}</p>
+          </div>
+
+          <div class="section">
+            <h2>⚠️ Issues</h2>
+            <p style="color:red">${report.issues || 'No issues reported'}</p>
+          </div>
+
+          <div class="section">
+            <h2>💬 Comments</h2>
+            <p>${report.comments || '-'}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
 }
 
 module.exports = new EmailService();
