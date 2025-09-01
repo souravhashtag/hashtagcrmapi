@@ -21,15 +21,15 @@ const companyDetailsSchema = new Schema({
     country: String,
     zipCode: String
   },
-  contactInfo: {
-    phone: String,
-    email: {
-      type: String,
-      lowercase: true,
-      trim: true
-    },
-    website: String
-  },
+  // contactInfo: {
+  //   phone: String,
+  //   email: {
+  //     type: String,
+  //     lowercase: true,
+  //     trim: true
+  //   },
+  //   website: String
+  // },
   // CEO Information
   ceo: {
     name: String,
@@ -139,7 +139,7 @@ companyDetailsSchema.pre('save', function (next) {
 // Indexes
 companyDetailsSchema.index({ domain: 1 }, { unique: true });
 companyDetailsSchema.index({ 'ceo.userId': 1 });
-companyDetailsSchema.index({ 'contactInfo.email': 1 });
+// companyDetailsSchema.index({ 'contactInfo.email': 1 });
 
 // Methods to manage leave allocations
 companyDetailsSchema.methods.getLeaveAllocation = function (leaveType) {

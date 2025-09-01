@@ -3,12 +3,12 @@ const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/CompanyController');
 const UserController = require('../controllers/UserController');
-const upload = require('../config/profile-image-upload');
+const document = require("../config/document")
 
 // Basic company management
 router.get('/', UserController.verifyToken, controller.getCompanyDetails);
 router.post('/initialize', UserController.verifyToken, controller.initializeCompany);
-router.put('/', upload.single('profileImage'), UserController.verifyToken, controller.updateCompanyInfo);
+router.put('/', document.single('profilePicture'), UserController.verifyToken, controller.updateCompanyInfo);
 router.get('/exists', controller.checkCompanyExists);
 
 // Settings management

@@ -590,7 +590,7 @@ class EmployeeController {
       let documentUrls = [];
       let profilePictureUrl = null;
 
-      console.log('Files received:', req.files); // Removed the 'return' here
+      // console.log('Files received:', req.files); // Removed the 'return' here
 
       if (req.files && Array.isArray(req.files) && req.files.length > 0) {
         const profilePictures = req.files.filter(file => file.fieldname === 'profilePicture');
