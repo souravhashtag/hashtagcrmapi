@@ -103,9 +103,38 @@ class CompanyController {
   // Update company info
   async updateCompanyInfo(req, res) {
     try {
-      const updateData = { ...req.body };
+      const updateData = {};
+      
+      //console.log('Request body:', req.body);
+      //console.log('Uploaded file:', req.file);
+      
+      // Helper function to safely set nested properties
+      const setNestedProperty = (obj, path, value) => {
+        if (!value && value !== 0 && value !== false) return; // Skip empty values
+        
+        const keys = path.split('.');
+        let current = obj;
+        
+        for (let i = 0; i < keys.length - 1; i++) {
+          if (!current[keys[i]]) {
+            current[keys[i]] = {};
+          }
+          current = current[keys[i]];
+        }
+        
+        current[keys[keys.length - 1]] = value;
+      };
 
-      // normalize emails
+      Object.keys(req.body).forEach(key => {
+        const value = req.body[key];
+        
+        if (value && typeof value === 'string' && value.trim() !== '') {
+          setNestedProperty(updateData, key, value.trim());
+        } else if (value && typeof value !== 'string') {
+          setNestedProperty(updateData, key, value);
+        }
+      });
+
       if (updateData.contactInfo?.email) {
         updateData.contactInfo.email = updateData.contactInfo.email.toLowerCase();
       }
@@ -116,43 +145,65 @@ class CompanyController {
         updateData.ceo.email = updateData.ceo.email.toLowerCase();
       }
 
-      // ✅ if file uploaded, set ceo.profileImage
       if (req.file) {
         const baseUrl = process.env.FRONT_BASE_URL || 'http://localhost:5000';
-        updateData.ceo = {
-          ...(updateData.ceo || {}),
-          profileImage: `${baseUrl}/uploads/company/${req.file.filename}`
-        };
+        
+        if (!updateData.ceo) {
+          updateData.ceo = {};
+        }
+        
+        updateData.ceo.profileImage = `${baseUrl}/uploads/company/${req.file.filename}`;
       }
 
+      console.log('Final update data:', JSON.stringify(updateData, null, 2));
+
+      // Find existing company first to merge data properly
+      const existingCompany = await companyDetails.findOne({});
+      
+      if (!existingCompany) {
+        return res.status(404).json({
+          success: false,
+          message: 'Company not found. Please initialize company first.'
+        });
+      }
+
+      // Perform the update
       const updatedCompany = await companyDetails.findOneAndUpdate(
-        {},
+        { _id: existingCompany._id },
         { $set: updateData },
-        { new: true, runValidators: true, upsert: false }
+        { 
+          new: true, 
+          runValidators: true,
+          // This option helps with nested object updates
+          overwrite: false
+        }
       );
-
-      if (!updatedCompany) {
-        return res.status(404).json({
-          success: false,
-          message: 'Company not found. Please initialize company first.'
-        });
-      }
-
-
-      if (!updatedCompany) {
-        return res.status(404).json({
-          success: false,
-          message: 'Company not found. Please initialize company first.'
-        });
-      }
 
       res.status(200).json({
         success: true,
         message: 'Company information updated successfully',
         data: updatedCompany
       });
+
     } catch (error) {
       console.error('Error updating company:', error);
+      
+      // More specific error handling
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          errors: Object.values(error.errors).map(err => err.message)
+        });
+      }
+      
+      if (error.code === 11000) {
+        return res.status(409).json({
+          success: false,
+          message: 'Duplicate key error. Company domain might already exist.'
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: 'Error updating company information',
