@@ -43,6 +43,11 @@ const companyDetailsSchema = new Schema({
     profileImage: String
   },
   settings: {
+    considerableLateCount: {
+      type: Number,
+      default: 3,
+      min: 0
+    },
     // CEO Talk settings
     ceoTalk: {
       Message: {
