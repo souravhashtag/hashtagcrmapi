@@ -105,7 +105,7 @@ class CompanyController {
     try {
       const updateData = {};
       
-      //console.log('Request body:', req.body);
+      console.log('Request body:', req.body);
       //console.log('Uploaded file:', req.file);
       
       // Helper function to safely set nested properties
