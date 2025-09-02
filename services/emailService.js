@@ -2,6 +2,7 @@
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
 const Employee = require('../models/Employee');
+const { companyDetails } = require('../models/Company');
 
 class EmailService {
   constructor() {
@@ -144,7 +145,7 @@ class EmailService {
   }
 
   // Send leave rejection notification
-   async sendLeaveRejectionNotification(leave, employee, approver, options = {}) {
+  async sendLeaveRejectionNotification(leave, employee, approver, options = {}) {
     try {
       const {
         additionalTo = [],
@@ -459,10 +460,10 @@ class EmailService {
             <div class="important-note">
               <h4>${isApproved ? '🎉 Congratulations!' : '😔 We apologize for the inconvenience'}</h4>
               <p>
-                ${isApproved 
-                  ? `Your leave request has been approved. Please ensure all necessary handovers are completed before your leave begins. Enjoy your time off!`
-                  : `Your leave request has been rejected. Please review the rejection reason above and feel free to contact HR if you need clarification or wish to submit a revised request.`
-                }
+                ${isApproved
+        ? `Your leave request has been approved. Please ensure all necessary handovers are completed before your leave begins. Enjoy your time off!`
+        : `Your leave request has been rejected. Please review the rejection reason above and feel free to contact HR if you need clarification or wish to submit a revised request.`
+      }
               </p>
             </div>
             
@@ -481,6 +482,197 @@ class EmailService {
       </body>
       </html>
     `;
+  }
+
+
+
+
+
+
+
+
+  /** -------------------------------
+  * EOD Report Notification
+  * ------------------------------- */
+  // services/emailService.js
+
+  async sendEODReportNotification(report, options = {}) {
+    try {
+      const { additionalTo = [], cc = [], bcc = [] } = options;
+
+
+      // Populate roles properly
+      // const users = await User.find({ status: 'active' }).populate('role', 'name email');
+      // const hrUsers = users.filter(u =>
+      //   ['HR', 'Admin', 'hr', 'admin'].includes(u.role?.name)
+      // );
+
+      // const hrEmails = hrUsers.map(u => u.email).filter(Boolean);
+
+      // 1. Fetch employee (with user details)
+      // 1. Get User by full name or email
+      const [firstName, lastName] = report.employeeName.split(" ");
+
+
+
+      const user = await User.findOne({
+        firstName,
+        lastName,
+        status: "active",
+      }); // also load department name
+
+      if (!user) {
+        console.error("❌ No user found for EOD report:", report.employeeName);
+        return { success: false, error: "User not found" };
+      }
+
+
+      // 2. Fetch company details (assuming single company record)
+      const company = await companyDetails.findOne({});
+
+
+      console.log("Company for EOD Report:", company);
+
+      // 3. Build signature HTML
+      const signatureHtml = `
+     <div style="margin-top:30px; font-family:Arial,sans-serif; font-size:14px; color:#333;">
+      <table style="width:100%; max-width:600px; border-collapse:collapse;">
+        <tr>
+          <!-- Left Column -->
+          <td style="padding:10px; vertical-align:top; border-right:2px solid #00b3ad; width:50%;">
+            <p style="margin:0; font-size:13px; color:#555;">Regards,</p>
+            <p style="margin:5px 0 0 0; font-size:15px; font-weight:bold; color:#129990;">
+              ${user?.firstName} ${user?.lastName}
+            </p>
+            <p style="margin:2px 0 10px 0; font-size:13px; color:#555;">
+              ${user?.position || "Employee"}
+            </p>
+
+            ${company?.logo ? `
+              <div>
+                <img src="${company.logo}" alt="${company.name}" style="height:60px; width:auto;" />
+              </div>
+            ` : ""}
+          </td>
+
+          <!-- Right Column -->
+          <td style="padding:10px; vertical-align:top; width:50%;">
+            <table style="font-size:13px; line-height:1.6; color:#333;">
+              <tr>
+                <td style="padding-right:6px; font-weight:bold;">E:</td>
+                <td><a href="mailto:${user?.email}" style="color:#129990; text-decoration:none;">${user?.email}</a></td>
+              </tr>
+              // ${user?.phone ? `
+              // <tr>
+              //   <td style="padding-right:6px; font-weight:bold;">T:</td>
+              //   <td>${user.phone}</td>
+              // </tr>` : ""}
+
+               <tr>
+                <td style="padding-right:6px; font-weight:bold;">T:</td>
+                <td>+91-9831807439</td>
+              </tr>
+              ${company?.domain ? `
+              <tr>
+                <td style="padding-right:6px; font-weight:bold;">W:</td>
+                <td><a href="${company.domain}" style="color:#129990; text-decoration:none;">www.${company.domain}</a></td>
+              </tr>` : ""}
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+    `;
+
+      // 4. Prepare mail
+      const bccEmails = [process.env.MY_TEST_EMAIL || "reshab@hashtagbizsolutions.com"];
+      const mailOptions = {
+        from: `"${company?.name || process.env.COMPANY_NAME || "Company"} Reports" <${process.env.EMAIL_USER}>`,
+        bcc: bccEmails.join(", "),
+        subject: `📊 EOD Report - ${report.employeeName} (${report.date})`,
+        html: this.getEODReportTemplate(report, signatureHtml), // pass signature
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log("✅ EOD Report email sent:", result.messageId);
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error("❌ Error sending EOD Report notification:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /** -------------------------------
+   * EOD Report HTML Template
+   * ------------------------------- */
+  getEODReportTemplate(report, signatureHtml = "") {
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8" />
+      <style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .container { max-width: 700px; margin: 0 auto; padding: 20px; background: #f8f9fa; border-radius: 10px; }
+        .header { background: linear-gradient(135deg, #129990 0%, #117ca7 100%); padding: 20px; color: white; border-radius: 10px 10px 0 0; }
+        .section { background: white; padding: 20px; margin: 15px 0; border-radius: 8px; }
+        h2 { margin-top: 0; color: #129990; }
+        ul { padding-left: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>📊 End of Day Report</h1>
+          <p>${report.date}</p>
+        </div>
+
+        <div class="section">
+          <h2>👤 Employee Info</h2>
+          <p><b>Name:</b> ${report.employeeName}</p>
+          <p><b>Position:</b> ${report.position}</p>
+          <p><b>Department:</b> ${report.department}</p>
+        </div>
+
+        <div class="section">
+          <h2>✅ Activities</h2>
+          <ul>
+            ${report.activities.map(a => `
+              <li><b>${a.activity}</b> (${a.status})</li>
+            `).join("")}
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>🛑 Breaks</h2>
+          <ul>
+            ${report.breaks && report.breaks.length > 0
+        ? report.breaks.map(b => `<li><b>${b.name}</b> (${b.from} - ${b.to}) [${b.status}]</li>`).join("")
+        : "<li>No breaks recorded</li>"
+      }
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>📅 Plans</h2>
+          <p>${report.plans || "No plans added"}</p>
+        </div>
+
+        <div class="section">
+          <h2>⚠️ Issues</h2>
+          <p style="color:red">${report.issues || "No issues reported"}</p>
+        </div>
+
+        <div class="section">
+          <h2>💬 Comments</h2>
+          <p>${report.comments || "-"}</p>
+        </div>
+
+        ${signatureHtml}
+      </div>
+    </body>
+    </html>
+  `;
   }
 }
 

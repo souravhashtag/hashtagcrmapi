@@ -21,15 +21,15 @@ const companyDetailsSchema = new Schema({
     country: String,
     zipCode: String
   },
-  // contactInfo: {
-  //   phone: String,
-  //   email: {
-  //     type: String,
-  //     lowercase: true,
-  //     trim: true
-  //   },
-  //   website: String
-  // },
+  contactInfo: {
+    phone: String,
+    email: {
+      type: String,
+      lowercase: true,
+      trim: true
+    },
+    website: String
+  },
   // CEO Information
   ceo: {
     name: String,
