@@ -134,10 +134,11 @@ class CompanyController {
           setNestedProperty(updateData, key, value);
         }
       });
-
-      if (updateData.contactInfo?.email) {
-        updateData.contactInfo.email = updateData.contactInfo.email.toLowerCase();
+      const contactInfo = JSON.parse(updateData.contactInfo);
+      if (contactInfo?.email) {
+        contactInfo.email = contactInfo.email.toLowerCase();
       }
+      updateData.contactInfo = contactInfo;
       if (updateData.domain) {
         updateData.domain = updateData.domain.toLowerCase();
       }
@@ -152,7 +153,7 @@ class CompanyController {
           updateData.ceo = {};
         }
         
-        updateData.ceo.profileImage = `${baseUrl}/uploads/company/${req.file.filename}`;
+        updateData.ceo.profileImage = `${baseUrl}/uploads/profilepicture/${req.file.filename}`;
       }
 
       console.log('Final update data:', JSON.stringify(updateData, null, 2));
