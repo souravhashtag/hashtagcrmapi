@@ -86,7 +86,7 @@ class UserController {
   static GetScreenShot = async (req, res) => {
     try {
       const screenshots = await ScreenShot.find().populate('userid', 'firstName email');
-      res.status(201).json(screenshots.reverse());
+      res.status(200).json(screenshots.reverse());
     } catch (err) {
       console.log(err)
     }

@@ -10,6 +10,7 @@ const employeeSchema = new Schema({
   },
   joiningDate: { type: Date, required: true },
   dob: { type: Date, required: true },
+  workingTimezone: { type: String, required: true },
   emergencyContact: {
     name: String,
     relationship: String,
