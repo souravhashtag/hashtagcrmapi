@@ -78,7 +78,7 @@ class UserController {
       const screenshot = new ScreenShot({ userid: req.user.id, image });
       const saveimage = await screenshot.save();
 
-      res.status(201).json({ message: "Images uploaded successfully", data: saveimage });
+      res.status(200).json({ message: "Images uploaded successfully", data: saveimage });
     } catch (err) {
       console.log(err)
     }
