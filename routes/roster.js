@@ -9,6 +9,8 @@ router.get('/employee/:employeeId', UserController.verifyToken, rosterController
 
 router.get('/stats/:year/:weekNumber', UserController.verifyToken, rosterController.getRosterStats);
 
+router.get('/rosterforallemployee/:employeeId', UserController.verifyToken, rosterController.getRosterforallEmployee);
+
 router.post('/', UserController.verifyToken, rosterController.addRoster);
 
 router.post('/bulk', UserController.verifyToken, rosterController.bulkAddRoster);

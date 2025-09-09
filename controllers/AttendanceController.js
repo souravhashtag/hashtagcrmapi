@@ -15,7 +15,10 @@ class AttendanceController {
     };
     static createAttendance = async (req, res) => {
       try {
-        const pstNow = moment.tz('America/Los_Angeles');
+        const employee = await Employee.findOne({
+          userId: req.user.id
+        });
+        const pstNow = moment.tz(employee?.workingTimezone);
 
         const pstMidnight = pstNow.clone().startOf('day');
          
@@ -28,9 +31,7 @@ class AttendanceController {
         });
         const weekNumber = AttendanceController.getWeekNumber(dateField);
         const year = pstNow.year();
-        const employee = await Employee.findOne({
-          userId: req.user.id
-        });
+        
         // 1. Find roster for this user & week
         const roster = await Roster.findOne({
           employee_id: employee._id,
@@ -42,7 +43,7 @@ class AttendanceController {
         let attendanceStatus = "present"; // default
         if (roster && roster[dayName]) {
           const { start_time } = roster[dayName];
-          const startMoment = moment.tz(start_time, "DD-MM-YYYY HH:mm", "America/Los_Angeles");
+          const startMoment = moment.tz(start_time, "DD-MM-YYYY HH:mm", employee?.workingTimezone);
           // console.log("dayName===>",pstNow);return;
 
           if (pstNow.isAfter(startMoment)) {
@@ -89,7 +90,10 @@ class AttendanceController {
     };
     static clockOutAttendance = async (req, res) => {
       try {
-        const pstNow = moment.tz('America/Los_Angeles');
+        const employee = await Employee.findOne({
+          userId: req.user.id
+        });
+        const pstNow = moment.tz(employee?.workingTimezone);
         
         // Find the attendance record where clockOut is null (user is still clocked in)
         const record = await Attendance.findOne({
@@ -128,7 +132,11 @@ class AttendanceController {
     };
     static getIndividualClockInData = async(req, res) => {       
         try {
-            const pstNow = moment.tz('America/Los_Angeles');
+            const employee = await Employee.findOne({
+              userId: req.user.id
+            });
+            const pstNow = moment.tz(employee?.workingTimezone);
+            //const pstNow = moment.tz('America/Los_Angeles');
             const pstMidnight = pstNow.clone().startOf('day');
             // const dateField = pstMidnight.toDate();
             const dateField = pstNow.toISOString().split('T')[0];
@@ -159,7 +167,10 @@ class AttendanceController {
     }
     static takeaBreak = async(req, res) => {       
       try {
-          const pstNow = moment.tz('America/Los_Angeles');
+          const employee = await Employee.findOne({
+            userId: req.user.id
+          });
+          const pstNow = moment.tz(employee?.workingTimezone);
           
           // Find active attendance record (where clockOut is null)
           const record = await Attendance.findOne({
@@ -193,7 +204,10 @@ class AttendanceController {
     }
     static ResumeWork = async(req, res) => {         
       try {
-          const pstNow = moment.tz('America/Los_Angeles');
+          const employee = await Employee.findOne({
+            userId: req.user.id
+          });
+          const pstNow = moment.tz(employee?.workingTimezone);
           
           const record = await Attendance.findOne({
               userId: req.user.id,
@@ -354,6 +368,185 @@ class AttendanceController {
         res.status(500).json({
           success: false,
           message: 'Error fetching attendance data',
+          error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+        });
+      }
+    };
+    static getAttendanceByDateRange = async (req, res) => {
+      try {
+        const { startDate, endDate } = req.query; // Expected format: ?startDate=2025-09-01&endDate=2025-09-30
+        
+        // Validate date formats
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid date format. Use YYYY-MM-DD for both startDate and endDate'
+          });
+        }
+        
+        const start = new Date(startDate + 'T00:00:00.000Z');
+        const end = new Date(endDate + 'T23:59:59.999Z');
+        
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid date values'
+          });
+        }
+        
+        if (start > end) {
+          return res.status(400).json({
+            success: false,
+            message: 'Start date must be before or equal to end date'
+          });
+        }
+        
+        // Get attendance records for the date range
+        let attendanceRecords = await Attendance.find({
+          date: {
+            $gte: start,
+            $lte: end
+          }
+        })
+        .populate({
+          path: 'userId',
+          select: '_id firstName lastName email',
+        })
+        .sort({ date: 1, createdAt: 1 });
+        
+        // Get employee info
+        const userIds = attendanceRecords.map(a => a.userId?._id).filter(Boolean);
+        const employees = await Employee.find({ userId: { $in: userIds } })
+          .populate({
+            path: 'userId',
+            select: '_id firstName lastName email'
+          })
+          .select('userId _id workingTimezone');
+        
+        const employeeMap = employees.reduce((acc, emp) => {
+          acc[emp.userId._id.toString()] = emp;
+          return acc;
+        }, {});
+        
+        // Group attendance by employee (THIS IS THE KEY CHANGE)
+        const employeeAttendanceMap = {};
+        
+        attendanceRecords.forEach(record => {
+          if (!record.userId) return;
+          
+          const userId = record.userId._id.toString();
+          const employee = employeeMap[userId];
+          
+          if (!employee) return;
+          
+          if (!employeeAttendanceMap[userId]) {
+            employeeAttendanceMap[userId] = {
+              _id: record._id,
+              userId: {
+                _id: record.userId._id,
+                email: record.userId.email,
+                firstName: record.userId.firstName,
+                lastName: record.userId.lastName,
+                employeeId: employee._id,
+                workingTimezone: employee.workingTimezone
+              },
+              attendance: {}
+            };
+          }
+          
+          // Format the date as DD-MM-YYYY to match your structure
+          const recordDate = new Date(record.date);
+          const formattedDate = recordDate.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+          
+          // Structure the attendance data to match your format
+          employeeAttendanceMap[userId].attendance[formattedDate] = {
+            date: record.date,
+            clockIn: record.clockIn,
+            clockInUs: record.clockInUs,
+            clockOut: record.clockOut,
+            clockOutUs: record.clockOutUs,
+            breaks: record.breaks || [],
+            totalBreakDuration: record.totalBreakDuration || 0,
+            status: record.status,
+            totalHours: record.totalHours || 0,
+            location: record.location
+          };
+        });
+        
+        // Generate all dates in the range and fill missing dates
+        const dateArray = [];
+        const currentDate = new Date(start);
+        
+        while (currentDate <= end) {
+          const formattedDate = currentDate.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+          dateArray.push(formattedDate);
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
+        // Fill in missing dates for each employee
+        Object.values(employeeAttendanceMap).forEach(empData => {
+          dateArray.forEach(formattedDate => {
+            // If no attendance record exists for this date, create an absent entry
+            if (!empData.attendance[formattedDate]) {
+              // Convert back to proper date for the absent entry - FIX HERE
+              const [day, month, year] = formattedDate.split('-');
+              const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day)); // Add parseInt()
+              
+              empData.attendance[formattedDate] = {
+                date: date,
+                clockIn: null,
+                clockInUs: null,
+                clockOut: null,
+                clockOutUs: null,
+                breaks: [],
+                totalBreakDuration: 0,
+                status: "absent",
+                totalHours: 0,
+                location: null
+              };
+            }
+          });
+        });
+        
+        // Convert to array format as per your structure
+        const attendanceArray = Object.values(employeeAttendanceMap);
+        
+        // Generate summary
+        const summary = {
+          startDate,
+          endDate,
+          totalEmployees: attendanceArray.length,
+          totalRecords: attendanceRecords.length,
+          statusBreakdown: {}
+        };
+        
+        attendanceRecords.forEach(record => {
+          if (!summary.statusBreakdown[record.status]) {
+            summary.statusBreakdown[record.status] = 0;
+          }
+          summary.statusBreakdown[record.status]++;
+        });
+        
+        res.json({
+          success: true,
+          data:attendanceArray,
+          summary: summary
+        });
+        
+      } catch (error) {
+        console.error('Error fetching attendance by date range:', error);
+        res.status(500).json({
+          success: false,
+          message: error,
           error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
         });
       }
