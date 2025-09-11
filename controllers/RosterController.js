@@ -427,7 +427,7 @@ const RosterController = {
     try {
       const {
         fromYear,
-        fromWeekNumber,
+        fromWeekNumber, 
         toYear,
         toWeekNumber,
         employees = [] // Optional: specific employees, if empty copies all
@@ -440,7 +440,7 @@ const RosterController = {
       };
       
       if (employees.length > 0) {
-        query.employee_id = { $in: employees };
+        query.employee_id = { $in: employees }; 
       }
       
       const sourceRosters = await Roster.find(query);
