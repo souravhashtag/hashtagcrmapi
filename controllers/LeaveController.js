@@ -4,6 +4,17 @@ const moment = require('moment');
 const emailService = require("../services/emailService");
 const LeaveType = require("../models/LeaveType");
 const EventLogger = require("./EventController");
+const Attendance = require("../models/Attendance");
+
+// helper to normalize a date to UTC midnight
+function normalizeToUtcMidnight(date) {
+  return new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate()
+  ));
+}
+
 
 class LeaveController {
 
@@ -583,19 +594,20 @@ class LeaveController {
         id,
         updateData,
         { new: true }
-      ).populate([
-        {
-          path: 'employeeId',
-          populate: {
-            path: 'userId',
-            select: 'firstName lastName email'
+      ).select('type totalDays startDate endDate')
+        .populate([
+          {
+            path: 'employeeId',
+            populate: {
+              path: 'userId',
+              select: '_id firstName lastName email'
+            }
+          },
+          {
+            path: 'approvedBy',
+            select: 'firstName lastName'
           }
-        },
-        {
-          path: 'approvedBy',
-          select: 'firstName lastName'
-        }
-      ]);
+        ]);
 
       // Send email notifications
       try {
@@ -677,6 +689,113 @@ class LeaveController {
         // Don't fail the response if logging fails
       }
 
+
+      // Log events for each date in the leave period
+      try {
+        const startDate = new Date(updatedLeave.startDate);
+        const endDate = new Date(updatedLeave.endDate);
+
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(0, 0, 0, 0);
+
+        const dates = [];
+        const cursor = new Date(start);
+        while (cursor <= end) {
+          const eventDateUtc = new Date(Date.UTC(
+            cursor.getFullYear(),
+            cursor.getMonth(),
+            cursor.getDate()
+          ));
+          dates.push(eventDateUtc);
+          cursor.setDate(cursor.getDate() + 1);
+        }
+
+        // 1. Log events
+        const logPromises = dates.map(dateOnlyUtc => {
+          return EventLogger.logEvent({
+            event_date: dateOnlyUtc,
+            event_description: `Leave ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+            event_type: "Leave",
+            userId: updatedLeave.employeeId?.userId?._id,
+            refId: updatedLeave._id
+          });
+        });
+
+        await Promise.all(logPromises);
+        if (status === 'approved') {
+          const attendancePromises = dates.map(async (dateOnlyUtc, index) => {
+            // normalize date to UTC midnight
+            const dateObj = normalizeToUtcMidnight(new Date(dateOnlyUtc));
+
+            let attendanceStatus = updatedLeave.type;
+
+            // If totalDays ends with .5 and this is the last day → mark half-day
+            if (
+              updatedLeave.totalDays % 1 === 0.5 &&
+              index === dates.length - 1
+            ) {
+              attendanceStatus = 'half-day';
+            }
+
+            if (attendanceStatus === 'half-day') {
+              let existingAttendance = await Attendance.findOne({
+                userId: updatedLeave.employeeId?.userId?._id,
+                date: dateObj
+              });
+
+
+              if (existingAttendance) {
+                await Attendance.findOneAndUpdate(
+                  { userId: updatedLeave.employeeId.userId._id, date: dateObj },
+                  { $set: { status: 'leave', notes: 'half-day' } },
+                  { new: true }
+                );
+              } else {
+                await Attendance.create({
+                  userId: updatedLeave.employeeId.userId._id,
+                  date: dateObj, 
+                  status: 'leave',
+                  clockIn: null,
+                  clockOut: null,
+                  totalHours: 0,   
+                  location: null,
+                  notes: `half-day`
+                });
+              }
+            } else {
+              await Attendance.deleteOne({
+                userId: updatedLeave.employeeId.userId._id,
+                date: dateObj
+              });
+
+              await Attendance.create({
+                userId: updatedLeave.employeeId.userId._id,
+                date: dateObj,
+                status: "leave",
+                clockIn: null,
+                clockOut: null,
+                totalHours: 0,
+                location: null,
+                notes: `On ${attendanceStatus} (fresh entry)`
+              });
+            }
+          });
+
+          await Promise.all(attendancePromises);
+          console.log(
+            `✅ Attendance processed for leave type: ${updatedLeave.type}, total days: ${updatedLeave.totalDays}`
+          );
+        }
+
+
+
+
+      } catch (logError) {
+        console.error('❌ Error logging leave events:', logError);
+      }
+
       res.status(200).json({
         success: true,
         message: `Leave ${status} successfully`,
@@ -724,20 +843,20 @@ class LeaveController {
 
       // Find employee to check ownership
       const employee = await Employee.findOne({ userId: req.user.id });
-      if (!employee || !leave.employeeId._id.equals(employee._id)) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only cancel your own leave requests'
-        });
-      }
+      // if (!employee || !leave.employeeId._id.equals(employee._id)) {
+      //   return res.status(403).json({
+      //     success: false,
+      //     message: 'You can only cancel your own leave requests'
+      //   });
+      // }
 
       // Check if leave can be cancelled
-      if (leave.status === 'approved') {
-        return res.status(400).json({
-          success: false,
-          message: 'Approved leaves cannot be cancelled'
-        });
-      }
+      // if (leave.status === 'approved') {
+      //   return res.status(400).json({
+      //     success: false,
+      //     message: 'Approved leaves cannot be cancelled'
+      //   });
+      // }
 
       if (leave.status === 'cancelled') {
         return res.status(400).json({
@@ -745,6 +864,36 @@ class LeaveController {
           message: 'Leave is already cancelled'
         });
       }
+      // Prevent cancelling same-day approved leave
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const leaveStart = new Date(leave.startDate);
+      leaveStart.setHours(0, 0, 0, 0);
+
+      if (leave.status === 'approved' && leaveStart.getTime() === today.getTime()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Approved leave that starts today cannot be cancelled'
+        });
+      }
+
+
+
+      if (leave.status === 'approved') {
+        // ✅ Delete attendance records for the leave period
+        const start = new Date(leave.startDate);
+        start.setUTCHours(0, 0, 0, 0);
+        const end = new Date(leave.endDate);
+        end.setUTCHours(0, 0, 0, 0);
+
+        await Attendance.deleteMany({
+          userId: leave.employeeId.userId._id,
+          date: { $gte: start, $lte: end }
+        });
+      }
+
+
 
       // Update leave status
       const updatedLeave = await Leave.findByIdAndUpdate(

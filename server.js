@@ -26,7 +26,7 @@ const CompanyRoutes = require('./routes/company');
 const CountryRoutes = require('./routes/countryRoutes')
 const rosterRoutes = require("./routes/roster");
 const salaryDeductionRule = require("./routes/salaryDeductionRules");
-const eodReportRoutes = require("./routes/eodReports");
+const eodReportRoutes = require("./routes/eodReports"); 
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
