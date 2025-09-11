@@ -546,7 +546,7 @@ const RosterController = {
       };
       
       if (employees.length > 0) {
-        query.employee_id = { $in: employees };
+        query.employee_id = { $in: employees }; 
       }
       
       const sourceRosters = await Roster.find(query);
