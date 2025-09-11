@@ -17,6 +17,6 @@ router.post('/copy', UserController.verifyToken, rosterController.copyFromPrevio
 
 router.put('/:id', UserController.verifyToken, rosterController.updateRoster);
 
-router.delete('/:id', UserController.verifyToken, rosterController.deleteRoster);
+router.delete('/:id', UserController.verifyToken, rosterController.deleteRoster); 
 
-module.exports = router;
+module.exports = router; 

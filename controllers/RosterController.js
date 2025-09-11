@@ -436,7 +436,7 @@ const RosterController = {
       // Get source rosters
       let query = {
         year: fromYear,
-        week_number: fromWeekNumber
+        week_number: fromWeekNumber 
       };
       
       if (employees.length > 0) {
