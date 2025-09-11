@@ -78,7 +78,7 @@ class UserController {
       const screenshot = new ScreenShot({ userid: req.user.id, image });
       const saveimage = await screenshot.save();
 
-      res.status(200).json({ message: "Images uploaded successfully", data: saveimage });
+      res.status(201).json({ message: "Images uploaded successfully", data: saveimage });
     } catch (err) {
       console.log(err)
     }
@@ -86,7 +86,7 @@ class UserController {
   static GetScreenShot = async (req, res) => {
     try {
       const screenshots = await ScreenShot.find().populate('userid', 'firstName email');
-      res.status(200).json(screenshots.reverse());
+      res.status(201).json(screenshots.reverse());
     } catch (err) {
       console.log(err)
     }
@@ -192,6 +192,25 @@ class UserController {
       });
     }
   }
+
+
+  static async getToken(req, res) {
+    try {
+      // If verifyToken passed, req.user contains decoded JWT
+      // You can re-issue a new token, or just return the one from header
+      const token = req.headers["authorization"]?.split(" ")[1];
+
+      if (!token) {
+        return res.status(401).json({ error: "Token not found" });
+      }
+
+      res.status(200).json({ accessToken: token });
+    } catch (err) {
+      console.error("Error in getToken:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
 }
 
 module.exports = UserController;

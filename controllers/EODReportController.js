@@ -1,22 +1,46 @@
 const EODReport = require("../models/EODReport");
 const emailService = require("../services/emailService");
+const { addEODReport } = require("../services/googleSheetService");
 
 class EODReportController {
     // ➡️ Create new report
+    // static async create(req, res) {
+    //     try {
+    //         const report = new EODReport(req.body);
+    //         await report.save();
+
+    //         // send email to HR/Admin + cc employee
+    //         await emailService.sendEODReportNotification(report, {
+    //             cc: [req.body.employeeEmail || ''] // if available
+    //         });
+
+    //         res.status(201).json({
+    //             success: true,
+    //             data: report,
+    //             message: "Report created and emailed successfully"
+    //         });
+    //     } catch (error) {
+    //         console.error("Error creating report:", error);
+    //         res.status(400).json({ success: false, message: error.message });
+    //     }
+    // }
+
+
     static async create(req, res) {
         try {
             const report = new EODReport(req.body);
             await report.save();
 
-            // send email to HR/Admin + cc employee
-            await emailService.sendEODReportNotification(report, {
-                cc: [req.body.employeeEmail || ''] // if available
-            });
+            // push into Google Sheet
+            await addEODReport(req.body);
+
+            // send email
+            await emailService.sendEODReportNotification(report, { cc: [req.body.employeeEmail || ''] });
 
             res.status(201).json({
                 success: true,
                 data: report,
-                message: "Report created and emailed successfully"
+                message: "Report created, emailed, and pushed to Google Sheet"
             });
         } catch (error) {
             console.error("Error creating report:", error);
