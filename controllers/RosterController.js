@@ -117,10 +117,8 @@ const RosterController = {
           message: 'Employee ID is required'
         });
       }
-      let query = { };
-      if(employeeId!="all"){
-        query = { employee_id: employeeId };
-      }
+      
+      let query = { employee_id: employeeId };
       
       if (startDate && endDate) {
         query.week_start_date = {
@@ -144,111 +142,6 @@ const RosterController = {
         data: roster
       });
       
-    } catch (error) {
-      console.error('Error fetching employee roster:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch employee roster',
-        error: error.message
-      });
-    }
-  },
-  getRosterforallEmployee: async (req, res) => { 
-    try {
-      const { employeeId } = req.params;
-      const { startDate, endDate } = req.query;
-
-      // Validate required fields
-      if (!employeeId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Employee ID is required'
-        });
-      }
-
-      // Validate dates
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid date format. Please use YYYY-MM-DD'
-        });
-      }
-
-      // Build query
-      let query = {
-        week_end_date: { $gte: start },
-        week_start_date: { $lte: end },
-      };
-
-      if (employeeId !== "all") {
-        query["employee_id._id"] = employeeId; 
-      }
-
-      // Fetch roster
-      const roster = await Roster.find(query)
-        .populate({
-          path: 'employee_id',
-          populate: {
-            path: 'userId',
-            select: 'firstName lastName email employeeId'
-          }
-        })
-        .sort({ week_start_date: 1 });
-
-      const dayMap = {
-        0: "sunday",
-        1: "monday",
-        2: "tuesday",
-        3: "wednesday",
-        4: "thursday",
-        5: "friday",
-        6: "saturday"
-      };
-
-      // Group data by employee
-      const rosterWithDates = {};
-
-      roster.forEach((ros) => {
-        const empId = ros.employee_id._id.toString();
-
-        if (!rosterWithDates[empId]) {
-          rosterWithDates[empId] = {
-            employee: ros.employee_id,
-            week_start_date: ros.week_start_date,
-            week_end_date: ros.week_end_date,
-            user: ros.employee_id.userId,
-            roster: {}
-          };
-        }
-
-        let current = new Date(ros.week_start_date);
-        const last = new Date(ros.week_end_date);
-
-        while (current <= last) {
-          const yyyy = current.getFullYear();
-          const mm = String(current.getMonth() + 1).padStart(2, '0');
-          const dd = String(current.getDate()).padStart(2, '0');
-          const dateStr = `${yyyy}-${mm}-${dd}`;
-
-          const dayName = dayMap[current.getDay()];
-
-          rosterWithDates[empId].roster[dateStr] = {
-            start_time: ros[dayName]?.start_time || null,
-            end_time: ros[dayName]?.end_time || null
-          };
-
-          current.setDate(current.getDate() + 1);
-        }
-      });
-
-      res.status(200).json({
-        success: true,
-        data: Object.values(rosterWithDates)
-      });
-
     } catch (error) {
       console.error('Error fetching employee roster:', error);
       res.status(500).json({
@@ -289,6 +182,7 @@ const RosterController = {
         status = 'draft'
       } = req.body;
       
+      // Check if roster already exists for this employee and week
       const existingRoster = await Roster.findOne({
         employee_id,
         year,

@@ -11,6 +11,8 @@ router.get('/take-a-break', UserController.verifyToken, AttendanceController.tak
 router.get('/resume-work', UserController.verifyToken, AttendanceController.ResumeWork);
 router.get('/geo-location', AttendanceController.GeoLocation);
 router.get('/date/:date',  UserController.verifyToken,   AttendanceController.getAttendanceByDate);
+
 router.get('/get-attendance-by-date-range/:employeeId', UserController.verifyToken, AttendanceController.getAttendanceByDateRange);  
+
 
 module.exports = router;
