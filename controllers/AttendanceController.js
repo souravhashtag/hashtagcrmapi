@@ -51,14 +51,27 @@ class AttendanceController {
           }
         }
         // console.log("attendanceStatus===>",attendanceStatus);return;
+        const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+        const geo = geoip.lookup(ip);
         if (existing) {
+          if(existing.clockIn ===null && existing.status === 'leave' && existing?.notes === 'half-day'){
+            existing.clockIn = clockInField;                        
+            existing.clockIn = clockInField;                        
+            existing.clockInUs = pstNow.format('MM/DD/YYYY hh:mm A z');
+            existing.clockOut = null; 
+            existing.clockOutUs = null;
+            existing.location = geo ? JSON.stringify(geo) : null
+            await existing.save();
+            return res.status(200).json({ status: 200, message: 'Clocked in successfully', data: existing });
+          }else if(existing.status === 'leave'){
+            return res.status(400).json({ status: 400, message: 'Attendance already marked as leave for today' });
+          }
           existing.clockOut = '';
           await existing.save();
           return res.status(200).json({ status: 200, message: 'Already clocked in today' });
         }
 
-        const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
-        const geo = geoip.lookup(ip);
+        
 
         const record = new Attendance({
           userId: req.user.id,
@@ -98,8 +111,10 @@ class AttendanceController {
         // Find the attendance record where clockOut is null (user is still clocked in)
         const record = await Attendance.findOne({
           userId: req.user.id,
-          clockOut: null  // Find record where user hasn't clocked out yet
-        }).sort({ clockIn: -1 }); // Get the most recent clock-in
+          clockOut: null,
+          clockIn: { $ne: null }
+        })
+        // .sort({ clockIn: -1 }); // Get the most recent clock-in
 
         if (!record) {
           return res.status(404).json({
@@ -142,8 +157,10 @@ class AttendanceController {
             const dateField = pstNow.toISOString().split('T')[0];
             const record = await Attendance.findOne({
                 userId: req.user.id,
-                clockOut: null
-            }).sort({ clockIn: -1 });
+                clockOut: null,
+                clockIn: { $ne: null }
+            })
+            // .sort({ clockIn: -1 });
             
             if (!record) {
                 return res.status(200).json({
@@ -175,8 +192,10 @@ class AttendanceController {
           // Find active attendance record (where clockOut is null)
           const record = await Attendance.findOne({
               userId: req.user.id,
-              clockOut: null
-          }).sort({ clockIn: -1 });
+              clockOut: null,
+              clockIn: { $ne: null }
+          })
+          // .sort({ clockIn: -1 });
           
           if (!record) {
               return res.status(404).json({
@@ -211,8 +230,10 @@ class AttendanceController {
           
           const record = await Attendance.findOne({
               userId: req.user.id,
-              clockOut: null
-          }).sort({ clockIn: -1 });
+              clockOut: null,
+              clockIn: { $ne: null }
+          })
+          // .sort({ clockIn: -1 });
           
           if (!record || record.breaks.length === 0) {
               return res.status(404).json({
@@ -473,6 +494,7 @@ class AttendanceController {
             breaks: record.breaks || [],
             totalBreakDuration: record.totalBreakDuration || 0,
             status: record.status,
+            notes: record.notes,
             totalHours: record.totalHours || 0,
             location: record.location
           };
@@ -509,7 +531,8 @@ class AttendanceController {
                 clockOutUs: null,
                 breaks: [],
                 totalBreakDuration: 0,
-                status: "absent",
+                status: "-",
+                notes: null,
                 totalHours: 0,
                 location: null
               };
