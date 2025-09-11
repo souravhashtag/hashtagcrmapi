@@ -21,4 +21,4 @@ router.put('/:id', UserController.verifyToken, rosterController.updateRoster);
 
 router.delete('/:id', UserController.verifyToken, rosterController.deleteRoster); 
 
-module.exports = router;
+module.exports = router; 
