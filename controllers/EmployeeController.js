@@ -260,7 +260,7 @@ class EmployeeController {
 
       filteredEmployees = filteredEmployees.map(emp => {
         if (emp.userId && emp.userId.profilePicture) {
-          const baseUrl = process.env.FRONT_BASE_URL || 'http://localhost:5000';
+          const baseUrl = process.env.SERVER_BASE_URL || 'http://localhost:5000';
           emp.userId.profilePicture = `${baseUrl}/${emp.userId.profilePicture}`;
         }
         return emp;

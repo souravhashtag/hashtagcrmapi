@@ -170,7 +170,7 @@ class UserController {
         return res.status(404).json({ error: "User not found" });
       }
       if (user && user.profilePicture) {
-        const baseUrl = process.env.FRONT_BASE_URL || 'http://localhost:5000';
+        const baseUrl = process.env.SERVER_BASE_URL || 'http://localhost:5000';
         user.profilePicture = `${baseUrl}/${user.profilePicture}`;
       }
       const role = await Role.findById(user.role);
