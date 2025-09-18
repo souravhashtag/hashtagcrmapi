@@ -18,13 +18,15 @@ class AttendanceController {
         const employee = await Employee.findOne({
           userId: req.user.id
         });
+        
         const pstNow = moment.tz(employee?.workingTimezone);
-
+        
         const pstMidnight = pstNow.clone().startOf('day');
          
-
+        // console.log("pstMidnight===>",pstMidnight.toDate());return
         const clockInField = pstNow.toDate(); 
-        const dateField = clockInField.toISOString().split('T')[0]; 
+        // const dateField = clockInField.toISOString().split('T')[0]; 
+        const dateField = pstNow.format("YYYY-MM-DD"); 
         const existing = await Attendance.findOne({
           userId: req.user.id,
           date: dateField
@@ -55,7 +57,7 @@ class AttendanceController {
         const geo = geoip.lookup(ip);
         if (existing) {
           if(existing.clockIn ===null && existing.status === 'leave' && existing?.notes === 'half-day'){
-            existing.clockIn = clockInField;                        
+            // existing.clockIn = clockInField;                        
             existing.clockIn = clockInField;                        
             existing.clockInUs = pstNow.format('MM/DD/YYYY hh:mm A z');
             existing.clockOut = null; 
@@ -300,46 +302,34 @@ class AttendanceController {
         endOfDay.setUTCHours(23, 59, 59, 999);
         
         // First, let's check what attendance records exist
-        const attendanceRecords = await Attendance.find({
-          date: {
-            $gte: startOfDay,
-            $lte: endOfDay
-          }
-        });
+        // const attendanceRecords = await Attendance.find({
+        //   date: {
+        //     $gte: startOfDay,
+        //     $lte: endOfDay
+        //   }
+        // });
         
-        // console.log('Raw attendance records:', attendanceRecords.map(r => ({ 
-        //   _id: r._id, 
-        //   userId: r.userId,
-        //   date: r.date,
-        //   status: r.status
-        // })));
         
+        
+        // let attendance = await Attendance.find({
+        //   date: {
+        //     $gte: startOfDay,
+        //     $lte: endOfDay
+        //   }
+        // })
         let attendance = await Attendance.find({
-          date: {
-            $gte: startOfDay,
-            $lte: endOfDay
-          }
+          date: date
         })
         .populate({
           path: 'userId',
           select: '_id firstName lastName email',          
         })
         .sort({ createdAt: -1 });
-        // console.log("attendance===>",attendance)
-        // attendance.map(record => {
-        //   if (record.userId) { 
-        //     const employee = Employee.findOne({ userId: record.userId._id }).select('_id');   
-        //     console.log("employee===>",employee)        
-        //         if (employee) {
-        //           record.userId.employeeId = employee._id;
-        //         }          }
-        // });    
+            
         const userIds = attendance.map(a => a.userId?._id).filter(Boolean);
 
-        // Fetch employees for these users
         const employees = await Employee.find({ userId: { $in: userIds } }).select('userId _id');
 
-        // Map employees by userId
         const employeeMap = employees.reduce((acc, emp) => {
           acc[emp.userId.toString()] = emp._id;
           return acc;
@@ -426,8 +416,8 @@ class AttendanceController {
         // Get attendance records for the date range
         let attendanceRecords = await Attendance.find({
           date: {
-            $gte: start,
-            $lte: end
+            $gte: startDate,
+            $lte: endDate
           }
         })
         .populate({
