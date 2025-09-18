@@ -85,10 +85,32 @@ class UserController {
   }
   static GetScreenShot = async (req, res) => {
     try {
-      const screenshots = await ScreenShot.find().populate('userid', 'firstName email');
-      res.status(200).json(screenshots.reverse());
+      // Get page and limit from query params (default: page=1, limit=10)
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+
+      const skip = (page - 1) * limit;
+
+      // Count total documents
+      const total = await ScreenShot.countDocuments();
+
+      // Fetch paginated data
+      const screenshots = await ScreenShot.find()
+        .populate('userid', 'firstName email')
+        .skip(skip)
+        .limit(limit)
+        .sort({ _id: -1 }); // instead of reverse(), sort by newest first
+
+      res.status(200).json({
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+        limit,
+        data: screenshots
+      });
     } catch (err) {
-      console.log(err)
+      console.error(err);
+      res.status(500).json({ error: "Server error" });
     }
   }
   static DeleteScreenShot = async (req, res) => {
