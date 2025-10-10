@@ -27,7 +27,7 @@ function extractCompanyPercents(company) {
     if (!c?.isActive) continue;
     const code = String(c.code || '').toLowerCase();
     const pct = Number(c.percent) || 0;
-    if (['basic','hra','allowances'].includes(code)) out[code] = pct;
+    if (['basic', 'hra', 'allowances'].includes(code)) out[code] = pct;
   }
   return out;
 }
@@ -61,8 +61,8 @@ function computeAmountForRule(rule, bases) {
   }
   const { mode, fixedAmount = 0, percent = 0 } = rule.compute || {};
   if (mode === 'fixed') return Math.max(0, Number(fixedAmount) || 0);
-  if (mode === 'percent_of_basic') return Math.max(0, ((Number(percent)||0)/100) * bases.basic);
-  if (mode === 'percent_of_gross') return Math.max(0, ((Number(percent)||0)/100) * bases.gross);
+  if (mode === 'percent_of_basic') return Math.max(0, ((Number(percent) || 0) / 100) * bases.basic);
+  if (mode === 'percent_of_gross') return Math.max(0, ((Number(percent) || 0) / 100) * bases.gross);
   return 0;
 }
 
@@ -106,7 +106,7 @@ function normalizePayload(body) {
   const payload = { ...body };
   if (!Array.isArray(payload.deductions)) payload.deductions = [];
 
-  ['month','year','grossSalary','basicSalary','bonus','overtimePay'].forEach((k) => {
+  ['month', 'year', 'grossSalary', 'basicSalary', 'bonus', 'overtimePay'].forEach((k) => {
     if (payload[k] != null && payload[k] !== '') payload[k] = Number(payload[k]);
   });
 
@@ -127,7 +127,7 @@ function normalizePayload(body) {
 
 /** Build server-driven payroll (structure + deductions) */
 async function buildServerDrivenPayroll(req, emp, month, year, activeRules) {
-  const company  = await resolveCompanyDoc(req);
+  const company = await resolveCompanyDoc(req);
   const percents = extractCompanyPercents(company);
 
   // ✅ Use employee salary.amount directly as gross
@@ -135,7 +135,7 @@ async function buildServerDrivenPayroll(req, emp, month, year, activeRules) {
 
   // Breakdown only for structure (not to override gross)
   const basic = (gross * (percents.basic ?? 0)) / 100;
-  const hra   = (gross * (percents.hra ?? 0)) / 100;
+  const hra = (gross * (percents.hra ?? 0)) / 100;
   const allowances = (gross * (percents.allowances ?? 0)) / 100;
 
   const salaryStructure = { basic, hra, allowances, bonus: 0, overtime: 0, otherEarnings: 0 };
@@ -163,7 +163,7 @@ async function buildServerDrivenPayroll(req, emp, month, year, activeRules) {
   // Totals: keep gross as-is, only compute net
   const totals = calcTotals(draft);
   draft.totalDeductions = totals.totalDeductions;
-  draft.netSalary       = totals.netSalary;
+  draft.netSalary = totals.netSalary;
 
   return draft;
 }
@@ -520,8 +520,8 @@ exports.listMyPayrolls = async (req, res) => {
         .limit(l)
         .populate({
           path: 'employeeId',
-          select: 'employeeId userId department',
-          populate: { path: 'userId', select: 'firstName lastName' },
+          select: 'employeeId userId',
+          populate: { path: 'userId', select: 'firstName lastName department', populate: { path: 'department', select: 'name' }, },
         }),
       Payroll.countDocuments(filter),
     ]);
@@ -581,7 +581,7 @@ exports.generateForAllEmployees = async (req, res) => {
   try {
     const now = new Date();
     const month = Number(req.body.month ?? req.query.month ?? (now.getMonth() + 1));
-    const year  = Number(req.body.year  ?? req.query.year  ?? now.getFullYear());
+    const year = Number(req.body.year ?? req.query.year ?? now.getFullYear());
     const includeExisting = (req.body.includeExisting ?? req.query.includeExisting ?? 'skip').toString();
 
     if (!month || month < 1 || month > 12) return res.status(400).json({ error: 'Month must be 1-12' });
@@ -623,15 +623,15 @@ exports.generateForAllEmployees = async (req, res) => {
         if (includeExisting === 'refresh') {
           const rebuilt = await buildServerDrivenPayroll(req, emp, month, year, activeRules);
           existing.salaryStructure = rebuilt.salaryStructure;
-          existing.basicSalary     = rebuilt.basicSalary;
-          existing.grossSalary     = rebuilt.grossSalary;
-          existing.deductions      = rebuilt.deductions;
+          existing.basicSalary = rebuilt.basicSalary;
+          existing.grossSalary = rebuilt.grossSalary;
+          existing.deductions = rebuilt.deductions;
 
           const totals = calcTotals(existing.toObject());
           existing.totalDeductions = totals.totalDeductions;
-          existing.grossSalary     = totals.grossSalary; // keep provided gross
-          existing.netSalary       = totals.netSalary;
-          existing.updatedAt       = new Date();
+          existing.grossSalary = totals.grossSalary; // keep provided gross
+          existing.netSalary = totals.netSalary;
+          existing.updatedAt = new Date();
           await existing.save();
 
           refreshed++;
