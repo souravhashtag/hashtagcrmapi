@@ -16,7 +16,7 @@ const payrollSchema = new Schema({
   deductions: [{
     type: {
       type: String,
-      enum: ['tax', 'hInsurance', 'pf', 'esi', 'pTax', 'tds', 'loan', 'advance', 'other']
+      // enum: ['tax', 'hInsurance', 'pf', 'esi', 'pTax', 'tds', 'loan', 'advance', 'other']
     },
     amount: Number,
     description: String
@@ -34,7 +34,7 @@ const payrollSchema = new Schema({
   paymentDate: Date,
   paymentMethod: {
     type: String,
-    enum: ['bank_transfer', 'check', 'cash', 'online']
+    // enum: ['bank_transfer', 'check', 'cash', 'online']
   },
   transactionId: String,
   payslipUrl: String,

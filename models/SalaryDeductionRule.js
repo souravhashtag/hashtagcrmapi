@@ -10,7 +10,7 @@ const ruleSchema = new Schema({
   },
   calculation_mode: { 
     type: String, 
-    enum: ['fixed', 'percent'], 
+    // enum: ['fixed', 'percent'], 
     required: true 
   },
   amount: { type: Number,  min: 0 },
