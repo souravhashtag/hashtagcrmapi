@@ -12,5 +12,7 @@ router.get('/resume-work', UserController.verifyToken, AttendanceController.Resu
 router.get('/geo-location', AttendanceController.GeoLocation);
 router.get('/date/:date',  UserController.verifyToken,   AttendanceController.getAttendanceByDate);
 router.get('/get-attendance-by-date-range/:employeeId', UserController.verifyToken, AttendanceController.getAttendanceByDateRange);  
+router.get('/check-missed-clockout', UserController.verifyToken, AttendanceController.checkMissedClockOut);
+router.post('/manual-clockout', UserController.verifyToken, AttendanceController.manualClockOut);
 
 module.exports = router;

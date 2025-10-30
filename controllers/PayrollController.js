@@ -4,6 +4,7 @@ const Employee = require('../models/Employee');
 // models
 const { companyDetails: CompanyDetails } = require('../models/Company'); // adjust path if different
 const SalaryDeductionRule = require('../models/SalaryDeductionRule');
+const Attendance = require('../models/Attendance'); // Assuming Attendance model exists; adjust path if different
 
 /* ========= helpers ========= */
 
@@ -21,7 +22,8 @@ async function resolveCompanyDoc(req) {
 }
 
 function extractCompanyPercents(company) {
-  const out = { basic: 50, hra: 40, allowances: 10 };
+  // Updated defaults to match frontend: 50% basic, 30% HRA, 20% allowances
+  const out = { basic: 50, hra: 30, allowances: 20 };
   const comps = company?.settings?.payroll?.components || [];
   for (const c of comps) {
     if (!c?.isActive) continue;
@@ -125,32 +127,71 @@ function normalizePayload(body) {
 }
 
 
-/** Build server-driven payroll (structure + deductions) */
+/** Build server-driven payroll (structure + deductions) - Updated to match frontend logic exactly */
 async function buildServerDrivenPayroll(req, emp, month, year, activeRules) {
   const company = await resolveCompanyDoc(req);
   const percents = extractCompanyPercents(company);
 
-  // ✅ Use employee salary.amount directly as gross
-  const gross = Number(emp?.salary?.amount) || 0;
+  // ✅ Use employee salary.amount directly as gross (monthly equivalent)
+  const gross = getGrossFromEmployee(emp);
 
-  // Breakdown only for structure (not to override gross)
-  const basic = (gross * (percents.basic ?? 0)) / 100;
-  const hra = (gross * (percents.hra ?? 0)) / 100;
-  const allowances = (gross * (percents.allowances ?? 0)) / 100;
+  // Breakdown to match frontend: 50% basic, 30% HRA, remaining allowances (using company percents, but defaults match frontend)
+  const basic = (gross * (percents.basic ?? 50)) / 100;
+  const hra = (gross * (percents.hra ?? 30)) / 100;
+  const allowances = gross - basic - hra; // Remaining, to match frontend exactly
 
   const salaryStructure = { basic, hra, allowances, bonus: 0, overtime: 0, otherEarnings: 0 };
 
   const bases = { gross, basic };
-  const deductions = (activeRules || []).map((r) => ({
-    type: r.type,
-    amount: Number(computeAmountForRule(r, bases).toFixed(2)),
-    description: r.name,
-  }));
+
+  // Rule-based deductions, matching frontend: apply all active, but skip if amount=0, special ESI handling
+  const ruleDeductions = [];
+  for (const r of activeRules) {
+    let amount = computeAmountForRule(r, bases);
+    if (r.code?.toLowerCase() === 'esi' && bases.gross >= 21000) {
+      amount = 0;
+    }
+    if (amount > 0) {
+      ruleDeductions.push({
+        type: r.type,
+        amount: Number(amount.toFixed(2)),
+        description: r.name,
+      });
+    }
+  }
+
+  // LOP deduction, matching frontend exactly
+  let lopDeduction = [];
+  const totalDays = new Date(year, month, 0).getDate();
+  if (totalDays > 0 && gross > 0) {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    const attendances = await Attendance.find({
+      userId: emp.userId,
+      date: { $gte: startDateStr, $lte: endDateStr },
+    }).lean();
+
+    const attendedDays = attendances.filter((record) => record.clockIn).length; // clockIn truthy if present
+    const absentDays = totalDays - attendedDays;
+    if (absentDays > 0) {
+      const perDay = gross / totalDays;
+      const lopAmount = absentDays * perDay;
+      lopDeduction = [{
+        type: 'LOP',
+        amount: Number(lopAmount.toFixed(2)),
+        description: `Loss of Pay for ${absentDays} absent day${absentDays !== 1 ? 's' : ''}`,
+      }];
+    }
+  }
+
+  const deductions = [...ruleDeductions, ...lopDeduction];
 
   const draft = {
     employeeId: emp._id,
     month, year,
-    grossSalary: gross,            // <-- always keep the actual salary.amount
+    grossSalary: gross,            // <-- always keep the actual salary.amount (monthly)
     salaryStructure,
     deductions,
     bonus: 0,
@@ -186,64 +227,6 @@ async function resolveEmployeeId(req) {
 
   return null; // not found
 }
-
-function calcTotals(doc) {
-  const s = doc.salaryStructure || {};
-  const baseBasic = Number(doc.basicSalary) || 0;
-
-  // Prefer salaryStructure.basic if provided; else fall back to basicSalary
-  const basic = Number(s.basic ?? baseBasic) || 0;
-  const hra = Number(s.hra) || 0;
-  const allowances = Number(s.allowances) || 0;
-  const sBonus = Number(s.bonus) || 0;
-  const sOvertime = Number(s.overtime) || 0;
-  const otherEarnings = Number(s.otherEarnings) || 0;
-
-  const topLevelBonus = Number(doc.bonus) || 0;
-  const topLevelOvertime = Number(doc.overtimePay) || 0;
-
-  const earnings =
-    basic + hra + allowances + sBonus + sOvertime + otherEarnings +
-    topLevelBonus + topLevelOvertime;
-
-  const deductionsTotal = (doc.deductions || []).reduce(
-    (acc, d) => acc + (Number(d.amount) || 0),
-    0
-  );
-
-  const grossSalary = earnings;
-  const netSalary = grossSalary - deductionsTotal;
-
-  return {
-    totalDeductions: Math.max(0, deductionsTotal),
-    grossSalary: Math.max(0, grossSalary),
-    netSalary: Math.max(0, netSalary),
-  };
-}
-
-// function normalizePayload(body) {
-//   const payload = { ...body };
-//   // Ensure arrays exist
-//   if (!Array.isArray(payload.deductions)) payload.deductions = [];
-//   // Coerce numeric fields (avoid strings creeping in)
-//   ['month', 'year', 'basicSalary', 'bonus', 'overtimePay'].forEach((k) => {
-//     if (payload[k] != null) payload[k] = Number(payload[k]);
-//   });
-//   if (payload.salaryStructure) {
-//     Object.keys(payload.salaryStructure).forEach((k) => {
-//       const v = payload.salaryStructure[k];
-//       if (v != null) payload.salaryStructure[k] = Number(v);
-//     });
-//   }
-//   // Recompute totals if needed
-//   const totals = calcTotals(payload);
-//   payload.totalDeductions = totals.totalDeductions;
-//   payload.grossSalary = totals.grossSalary;
-//   payload.netSalary = totals.netSalary;
-//   // Touch updatedAt
-//   payload.updatedAt = new Date();
-//   return payload;
-// }
 
 // -------- controllers --------
 
@@ -576,6 +559,9 @@ exports.getMyPayroll = async (req, res) => {
  *  - If includeExisting === 'refresh', we recompute totals for already-existing docs
  *    using their current fields (useful if deduction rules or structure changed).
  *  - Default behavior is 'skip' (don't touch existing docs).
+ * 
+ * This endpoint can be called manually or triggered automatically (e.g., via cron job at the start of every month).
+ * For auto-generation at start of month, set up a cron job like: 0 0 1 * * node /path/to/script-that-calls-this-endpoint-with-current-month-year
  */
 exports.generateForAllEmployees = async (req, res) => {
   try {
@@ -592,6 +578,7 @@ exports.generateForAllEmployees = async (req, res) => {
         {},
         {
           _id: 1,
+          userId: 1,
           'salary.amount': 1,
           'salary.paymentFrequency': 1,
           'salary.annual': 1,
@@ -623,13 +610,10 @@ exports.generateForAllEmployees = async (req, res) => {
         if (includeExisting === 'refresh') {
           const rebuilt = await buildServerDrivenPayroll(req, emp, month, year, activeRules);
           existing.salaryStructure = rebuilt.salaryStructure;
-          existing.basicSalary = rebuilt.basicSalary;
-          existing.grossSalary = rebuilt.grossSalary;
           existing.deductions = rebuilt.deductions;
 
           const totals = calcTotals(existing.toObject());
           existing.totalDeductions = totals.totalDeductions;
-          existing.grossSalary = totals.grossSalary; // keep provided gross
           existing.netSalary = totals.netSalary;
           existing.updatedAt = new Date();
           await existing.save();
